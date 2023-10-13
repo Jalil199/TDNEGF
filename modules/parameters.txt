@@ -1,0 +1,84 @@
+# Global parameters
+n = 5                              # number of sites
+n_lorentz = 31                     # number of lorentzians
+n_channels = 2                     # number of channels (2 for full spin)
+delta_tdep_L = 0
+delta_tdep_R = 0
+E_F_system = 0.0
+V_bias = 0.0                       # Fermi energy and Vbias
+alpha_r = 0.5                      # Rashba parameter
+theta_1 =45.
+phi_1 =  0.0                       # Angles of sub lattice 1
+theta_2 = 12.9
+phi_2 =  0.0                       # Angles of sub lattice 2
+# angles sublattice 1
+# angles sublattice 2
+period = 20                        # Period of precession
+N_rash = 0                         # number of magnetic moment with rashba from 0 to Nrash
+Temp =300.
+N_poles =  30                      # Temp, Npoles of the fermi function
+t_0 =0.0
+t_step =0.1
+t_end = 2000                       # time to start step and end
+# light flag
+J_sd = 0.1                         # jsd_to_llg from classical spin to H_el
+n_precessing = 5                   # number of spins precessing
+solver = "denis"
+cspin_orientation = "sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
+# domain wall width
+# t_long time before start llg
+# t_bias time before start vbias
+# llg_step Num of TDNEGF steps between LLG
+################################## Parameters for the spin liquid
+A = [0, 5, 6, 1, 7]  # Sites where the entropy will be calculated for the spin liquid
+J_qsl = 0.0
+θ = pi   # pi is ferro, 0 is antiferro, and 3pi/2 is spin liquid
+save_data_qsl = Dict("curr" => true, "scurr" => true, "sden_eq" => true, "sden_neq" => true,
+                     "rho" => true, "sclas" => true, "ent" => true, "sden_qsl" => true)
+################################## Parameters in the llg equations
+n_sites = n                       # number of LLG sites (equal to -1)
+nt = 1                            # number of time steps in llg
+dt = 0.1                          # time interval of a single LLG step
+h0 = [0.0, 0.0, 0.0]              # external magnetic field vector
+j_exc = 0.0                       # jexc coupling between classical spins
+g_lambda = 0.0                    # gilbert damping factor
+j_sd = 0.1                        # jsd in the llg equation
+j_dmi = 0.0                       # Dyaloshinski-Moriya
+j_ani = 0.0                       # Magnetic anisotropy
+j_dem = 0.0                       # Demagnetization field
+e = [0.0, 0.0, 0.0]               # Direction of magnetic anisotropy
+e_demag = [0.0, 0.0, 0.0]         # Direction of demagnetization vector
+js_pol = 0.0                      # Jsd coupling of the polarizer
+js_ana = 0.0                      # Jsd_coupling of the analyzer
+thop = 1.0                        # Hopping in the central part
+p_theta = 0.0                     # polarizer vector theta
+p_phi = 0.0                       # polarizer vector phi
+run_llg = false
+################################### Save and replay
+save_curr = true
+save_scurr = true                 # save currents
+rho = true
+sden = true                       # save densities
+# replay_llg
+# replay_cspins_file
+# save_cspins
+# save_spindensity_eq
+# save_spindensity_neq
+# save_charge_current
+# save_spin_currents
+# save_rho
+# preload_rkvec
+# save_rkvec_end
+# read_bias
+### name of the txt file 
+# cspins_file
+# spindensity_eq_file
+# spindensity_neq_file
+# charge_current_file
+# spin_current_sfile
+# bond_currents_file
+# rho_file
+read_bias_file = false
+bias_file = "./vtd.txt"
+name = "test_sym_pump"
+
