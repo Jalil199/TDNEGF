@@ -21,32 +21,32 @@ export w0_k1α,eps_k1α,gam_k1iα,k_poles,energy_llg,E_F_α,beta,
        drho_ab, J_sd_local, thop_local, tso_local 
 
 ### Global parameters 
-const n = 9                              ### number of sites
+const n = 5                              ### number of sites
 const n_lorentz = 31                     ### number of  lorentzians 
 const n_channels = 2                     ### number of channels(2 for full spin)
 const delta_tdep_L,delta_tdep_R  = 0,0
 const E_F_system, V_bias = 0., 0.        ### Fermi energy andd Vbias
 const E_F_left = E_F_system + 0.5*V_bias
 const E_F_right = E_F_system - 0.5*V_bias
-const alpha_r = 0.0                      ### Rashba parameter 
+const alpha_r = 0.5                      ### Rashba parameter 
 const theta_1, phi_1 = 45.0, 0.0         ### Angles of sub lattice 1
 const theta_2, phi_2 = 12.9, 0.0         ### Angles of sub lattice 2
 ##angles sublattice 1
 ##angles sublattice 2
-const period = 3                         ### Period of precession 
+const period = 20                         ### Period of precession 
 const N_rash = 0                         ### number of magnetic moment with rashba from 0 to Nrash 
 const Temp, N_poles = 300., 30           ### Temp, Npoles of the fermi function 
-const t_0, t_step, t_end = 0,0.1,500      ### time to start step and end
+const t_0, t_step, t_end = 0,0.1,2000      ### time to start step and end
 ##light flag 
-const J_sd = 0.5                         ### jsd_to_llg from classical spin to H_el
-const n_precessing = 0                   ### number of spins precessing 
+const J_sd = 0.1                         ### jsd_to_llg from classical spin to H_el
+const n_precessing = 5                   ### number of spins precessing 
 ##domain walll width 
 #t_long time before start llg 
 #t_bias time before start vbias 
 #llg_step Num of TDNEGF steps between LLG 
 #---------- Parameters for the spin liquid ----------#
 const A=[0,5,6,1,7]   ### Sites where the entropy will be calculateed for the spin liquid 
-const J_qsl = 0.2
+const J_qsl = 0.0
 const θ = pi   ### pi is ferro, 0 is antiferro and 3pi/2 is spin liquid
 const save_data_qsl = Dict("curr"=>true, "scurr"=>true, "sden_eq"=>true,"sden_neq"=>true, "rho"=>true, "sclas"=>true, "ent" =>true,"sden_qsl"=> true);
 #---------- Parameters in the llg equations----------#
@@ -56,7 +56,7 @@ const dt = 0.1                           ### time interval of a single LLG step
 const h0 = Float64[0., 0., 0.]           ### external magnetic field vector
 const j_exc = 0.0                        ### jexc coupling between classical spins
 const g_lambda = 0.0                     ### gilbert damping factor
-const j_sd = 0.5                         ### jsd in the llg equation
+const j_sd = 0.1                         ### jsd in the llg equation
 const j_dmi = 0.0                        ### Dyaloshinski-Moriya
 const j_ani = 0.0                        ### Magnetic anisotropy
 const j_dem = 0.0                        ### Demagnetization field 
@@ -83,7 +83,7 @@ const rho, sden = true,true              ### save densities
 #save_rkvec_end
 #read_bias
 const solver = "denis"
-const cspin_orientation = "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir" ;    ### Configuration of the classical spins
+const cspin_orientation = "sym_pump"#"polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir" ;    ### Configuration of the classical spins
 const save_data = Dict("curr"=>true, "scurr"=>true, "sden_eq"=>true,"sden_neq"=>true, "rho"=>true, "sclas"=>true );
 #cspins_file
 #spindensity_eq_file
@@ -92,9 +92,9 @@ const save_data = Dict("curr"=>true, "scurr"=>true, "sden_eq"=>true,"sden_neq"=>
 #spin_current_sfile
 #bond_currents_file
 #rho_file
-const read_bias_file  =  true
+const read_bias_file  =  false
 const bias_file  =  "./vtd.txt" ;
-const name = "test"
+const name = "test_sym_pump"
 #output_path
 #load_rkvector_file
 #save_rkvector_file

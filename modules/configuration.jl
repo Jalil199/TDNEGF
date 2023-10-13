@@ -112,7 +112,7 @@ function configure!(cname, llg_params, vm_a1x, pr_spins, t )
             for jj in 1: n::Int  ### Run over the number of sites of the lattice 
                 vm_a1x[jj][1] = 0.
                 vm_a1x[jj][2] = 0.
-                vm_a1x[jj][3] = 1.
+                vm_a1x[jj][3] = 0.
             end
             for jj in 1:n_precessing::Int #::Int 
                 pr_spins[jj].i = jj ## lattice site 
@@ -126,8 +126,8 @@ function configure!(cname, llg_params, vm_a1x, pr_spins, t )
         J_sd_local .= J_sd.*ones(n) 
         thop_local .= thop.*ones(n-1) 
         tso_local .= alpha_r.*zeros(ComplexF64,n-1)
-        tso_local[1] = -alpha_r*im
-        tso_local[4] =  -alpha_r*im
+        tso_local[1] = -alpha_r#*im
+        tso_local[4] =  -alpha_r#*im
         ### Modify the llg parameter (Note that more parameters can be modified around the evolution)
         ## Notice that j_sd is taken from the global parameters but it can be modified
         llg_params().js_exc .= ones(Float64, n_sites-1)*j_exc
@@ -135,12 +135,10 @@ function configure!(cname, llg_params, vm_a1x, pr_spins, t )
         #####################################
         end   
 
-
-
-
-
-        
-     for j in 1:n_precessing#length(pr_spins) 3:1:5
+     for j in 3:1:5#length(pr_spins) 3:1:5
+        vm_a1x[j][1] = 0.
+        vm_a1x[j][2] = 0.
+        vm_a1x[j][3] = 1
         update!(pr_spins[j], t )
         vm_a1x[pr_spins[j].i ] .= pr_spins[j].s
       end     

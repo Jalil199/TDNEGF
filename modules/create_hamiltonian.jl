@@ -24,7 +24,7 @@ function create_H(vm_a1x, m_qsl = nothing )
     #hops = -thop_local#.*ones(n-1) 
     H = -(diagm(-1 =>  thop_local) .+ diagm(1 =>  thop_local))
     # Include the spin degree of freedom 
-    H_so = -(diagm(-1 =>  tso_local) .+ diagm(1 =>  conj(tso_local) ))
+    H_so = -(diagm(-1 =>  tso_local*im ) .+ diagm(1 =>  tso_local*(-im) ))
     H = kron(H,σ_0) + kron(H_so, σ_y)
     m_a1x = hcat(vm_a1x...)#[:, :]
     # if we want to include the j_sd depending on the sites, we just must take the dot product 
