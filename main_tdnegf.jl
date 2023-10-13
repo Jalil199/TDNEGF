@@ -16,6 +16,8 @@ println("Modified and rewritten in julia by Jalil Varela-Manjarres")
 println("Number of threads used in operations is : " , Threads.nthreads()  )
 ### Internal modules
 include("./modules/parameters.jl")
+include("./modules/read_parameters.jl")
+include("./modules/get_parameters.jl")
 include("./modules/derived_constants.jl")
 include("./modules/configuration.jl")
 include("./modules/create_hamiltonian.jl")
@@ -29,7 +31,10 @@ include("./modules/osaki_poles.jl")
 include("./modules/precession.jl")
 println("Modules were  loaded")
 #push!(LOAD_PATH, "/home/jalil/Projects2023/TDNEGF/TDNEGF/modules/")
-using .parameters
+#using .parameters
+import .read_parameters: read_params
+read_params(;archivo_parametros= "./modules/parameters.txt")
+using .get_parameters
 using .derived_constants
 import .configuration: configure!
 import .create_hamiltonian: create_H
@@ -323,9 +328,6 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
     println("Total time of simulation: ", elapsed_time, " s" )
     nothing
 end
-
-
-
 
 
 ###############################################################################################

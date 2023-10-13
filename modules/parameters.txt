@@ -30,24 +30,22 @@ cspin_orientation = "sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"
 # t_bias time before start vbias
 # llg_step Num of TDNEGF steps between LLG
 ################################## Parameters for the spin liquid
-A = [0, 5, 6, 1, 7]  # Sites where the entropy will be calculated for the spin liquid
+A = 0, 5, 6, 1, 7  # Sites where the entropy will be calculated for the spin liquid
 J_qsl = 0.0
 θ = pi   # pi is ferro, 0 is antiferro, and 3pi/2 is spin liquid
-save_data_qsl = Dict("curr" => true, "scurr" => true, "sden_eq" => true, "sden_neq" => true,
-                     "rho" => true, "sclas" => true, "ent" => true, "sden_qsl" => true)
 ################################## Parameters in the llg equations
 n_sites = n                       # number of LLG sites (equal to -1)
 nt = 1                            # number of time steps in llg
 dt = 0.1                          # time interval of a single LLG step
-h0 = [0.0, 0.0, 0.0]              # external magnetic field vector
+h0 = 0.0, 0.0, 0.0              # external magnetic field vector
 j_exc = 0.0                       # jexc coupling between classical spins
 g_lambda = 0.0                    # gilbert damping factor
 j_sd = 0.1                        # jsd in the llg equation
 j_dmi = 0.0                       # Dyaloshinski-Moriya
 j_ani = 0.0                       # Magnetic anisotropy
 j_dem = 0.0                       # Demagnetization field
-e = [0.0, 0.0, 0.0]               # Direction of magnetic anisotropy
-e_demag = [0.0, 0.0, 0.0]         # Direction of demagnetization vector
+e = 0.0, 0.0, 0.0               # Direction of magnetic anisotropy
+e_demag = 0.0, 0.0, 0.0         # Direction of demagnetization vector
 js_pol = 0.0                      # Jsd coupling of the polarizer
 js_ana = 0.0                      # Jsd_coupling of the analyzer
 thop = 1.0                        # Hopping in the central part
