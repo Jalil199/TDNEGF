@@ -6,6 +6,7 @@ import .read_parameters: read_params
 using LinearAlgebra          ### Linear algebra library
 using StaticArrays           ### Small matrices 
 using DelimitedFiles         ### Manipulate files 
+loaded_parameters = read_params()
 ### Principal parameters
 export n, n_lorentz,n_channels,delta_tdep_L,delta_tdep_R,E_F_system, V_bias,
        E_F_left, E_F_right,alpha_r,theta_1,phi_1,theta_2,phi_2,period,N_rash,
@@ -71,6 +72,7 @@ const sden = get(loaded_parameters, "sden", true)
 const solver = get(loaded_parameters, "solver", "denis")
 const cspin_orientation = get(loaded_parameters, "cspin_orientation", "sym_pump")
 const bias_file = get(loaded_parameters, "bias_file", "./vtd.txt")
+const read_bias_file = get(loaded_parameters, "read_bias_file", "false")
 const name = get(loaded_parameters, "name", "test_sym_pump")
 
 #### Derived parameters 
@@ -78,6 +80,8 @@ const name = get(loaded_parameters, "name", "test_sym_pump")
 const E_F_left = E_F_system + 0.5 * V_bias
 const E_F_right = E_F_system - 0.5 * V_bias
 const save_data = Dict("curr" => true, "scurr" => true, "sden_eq" => true, "sden_neq" => true, "rho" => true, "sclas" => true)
+const save_data_qsl = Dict("curr" => true, "scurr" => true, "sden_eq" => true, "sden_neq" => true,
+                     "rho" => true, "sclas" => true, "ent" => true, "sden_qsl" => true)
 data_fit_pdbest = readdlm( "./selfenergy/selfenergy_1DTB_NNLS_31_pbest.csv" , ',', Float64)
 data_fit_Ulsq = readdlm( "./selfenergy/selfenergy_1DTB_NNLS_31_Ulsq.csv", ',', Float64) ;
 ### Elementary matrices
