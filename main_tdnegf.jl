@@ -53,7 +53,7 @@ function main()
     vm_a1x = [zeros(Float64,3) for _ in 1:n]                    ### array with vectors containiong the initial magnetization
     sm_eq_a1x = [zeros(Float64,3) for _ in 1:n] 
     diff = [zeros(Float64,3) for _ in 1:n]
-    delta_α = Float64[0. , 0.]
+    delta_αi = zeros(Float64,2,2)#Float64[0. , 0.]
     ### Set the initial configuration of the classical spins
     configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins, 0.0) ### set the initial values for pr_spins and vm_a1x
     H_ab = create_H(vm_a1x)                                             ### Initiallize the hamiltonian
@@ -64,31 +64,22 @@ function main()
     poles_denis, res_denis = init_denis(mu = E_F_system,temp=Temp,e_min=-3.,p=21)
     ### Read bias file
     if read_bias_file #& (i <= ti_bias)
-        delta_α::Vector{Float64} .= data_bias[1,:]
+        #delta_αi[:,1] .= data_bias[1,:]
+        delta_αi[1,1] = data_bias[1,1]
+        delta_αi[2,2] = data_bias[1,1] ##[1,2]
     else
-        delta_α .= [0. , 0.]
+        delta_αi .= zeros(Float64,2,2)#[0. , 0.]
     end
     ### Seting ODE for electrons-bath
-    prob = ODEProblem(eom!,rkvec, (0.0,t_end), [H_ab,delta_α] )         ### defines the problem for the differentia equation 
+    prob = ODEProblem(eom!,rkvec, (0.0,t_end), [H_ab,delta_αi] )         ### defines the problem for the differentia equation 
+    println(123)
     ### Open the files were the data is saved
-    if save_data["curr"]
-        cc_f = open("./data/cc_$(name)_jl.txt", "w+")
-    end
-    if save_data["scurr"]
-        sc_f = open("./data/sc_$(name)_jl.txt", "w+")
-    end
-    if save_data["sden_eq"]
-        seq_f = open("./data/seq_$(name)_jl.txt", "w+")
-    end
-    if save_data["sden_neq"]
-        sneq_f = open("./data/sneq_$(name)_jl.txt", "w+")
-    end
-    if save_data["rho"]
-        rkvec_f = open("./data/rkvec_$(name)_jl.txt", "w+")
-    end
-    if save_data["sclas"]
-        cspins_f = open("./data/cspins_$(name)_jl.txt", "w+")
-    end
+    save_data["curr"] && (cc_f = open("./data/cc_$(name)_jl.txt", "w+") )
+    save_data["scurr"] && (sc_f = open("./data/sc_$(name)_jl.txt", "w+") )
+    save_data["sden_eq"] && ( seq_f = open("./data/seq_$(name)_jl.txt", "w+") )
+    save_data["sden_neq"] && (sneq_f = open("./data/sneq_$(name)_jl.txt", "w+") )
+    save_data["rho"] && (rkvec_f = open("./data/rkvec_$(name)_jl.txt", "w+") )
+    save_data["sclas"] && (cspins_f = open("./data/cspins_$(name)_jl.txt", "w+") )
     ## Vern7 RK7/8
     integrator =  init(prob,Vern7(),dt=t_step, save_everystep=false,adaptive=true,dense=false)
     #,reltol=1e-12,abstol=1e-12)#,dt=t_step,reltol=1e-6,abstol=1e-6 )
@@ -103,56 +94,37 @@ function main()
         sm_eq_a1x .= spindensity_eq(vm_a1x,energy_llg; t = 1.0, Temp = Temp ) 
         diff .= sm_neq_a1x .- sm_eq_a1x
         ### Now the magnetization is computed at time t + dt
-        if run_llg
-            vm_a1x .= heun(vm_a1x, diff,t_step,llg_parameters)        ### magnetization at time t+dt
-        end
+        run_llg && (vm_a1x .= heun(vm_a1x, diff,t_step,llg_parameters)     )   ### magnetization at time t+dt
         ### If n_precessing > than 0 then the values are updated 
         ### Depending of the configuration, it modifies the configuration of the system
         ### at each time step 
         configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins,tt) 
         ### Calculate the needed observables at each time step 
         obs = Observables(integrator.u , params_0, false )
-        if save_data["curr"]
-            writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
-        end
-        if save_data["scurr"]
-            writedlm(sc_f, transpose(vcat(t,obs["scurr"]...) ), ' ' )
-        end
-        if save_data["sden_eq"]
-            writedlm(seq_f, transpose(vcat(t,sm_eq_a1x...) ), ' ' )
-        end
-        if save_data["sden_neq"]
-            writedlm(sneq_f, transpose(vcat(t,obs["sden"]...) ), ' ' )
-        end
-        if save_data["sclas"]
-            writedlm(cspins_f, transpose(vcat(t,vm_a1x...) ), ' ' )
-        end
+        save_data["curr"] && writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
+        save_data["scurr"] && writedlm(sc_f, transpose(vcat(t,obs["scurr"]...) ), ' ' )
+        save_data["sden_eq"] && writedlm(seq_f, transpose(vcat(t,sm_eq_a1x...) ), ' ' )
+        save_data["sden_neq"] && writedlm(sneq_f, transpose(vcat(t,obs["sden"]...) ), ' ' )
+        save_data["sclas"] && writedlm(cspins_f, transpose(vcat(t,vm_a1x...) ), ' ' )
         ### This way to modify the parameter can be improved !!!
         if read_bias_file# & (i <= ti_bias)
-            delta_α::Vector{Float64} .= data_bias[i+1,:]
+            ### Notice that here we are sending a fully polarized pump in the positive direction
+            #delta_αi[:,1] .= data_bias[i+1,:]
+            delta_αi[1,1] = data_bias[i+1,1]
+            delta_αi[2,2] = data_bias[i+1,1]
         else
-            delta_α .= [0. , 0.]
+            delta_αi .= zeros(Float64,2,2)#[0. , 0.]
         end
         integrator.p[1] .= create_H(vm_a1x)  
-        integrator.p[2] .=  delta_α
+        integrator.p[2] .=  delta_αi
     end ### This end is for the "for-loop"
     end ### This end is for the elapsed time
     ### The storage of this files must be checked 
-    if save_data["curr"]
-        close(cc_f)
-    end
-    if save_data["scurr"]
-        close(sc_f)
-    end
-    if save_data["sden_eq"]
-        close(seq_f)
-    end
-    if save_data["sden_neq"]
-        close(sneq_f)
-    end
-    if save_data["sclas"]
-        close(cspins_f )
-    end
+    save_data["curr"] && close(cc_f)
+    save_data["scurr"] && close(sc_f)
+    save_data["sden_eq"] && close(seq_f)
+    save_data["sden_neq"] && close(sneq_f)
+    save_data["sclas"] && close(cspins_f )
     if save_data["rho"]
         #### save the last step of the rkvec 
         writedlm(rkvec_f, transpose(integrator.u ), ' ')
@@ -177,7 +149,7 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
     vm_a1x = [zeros(Float64,3) for _ in 1:n]                    ### array with vectors containiong the initial magnetization
     sm_eq_a1x = [zeros(Float64,3) for _ in 1:n] 
     diff = [zeros(Float64,3) for _ in 1:n]
-    delta_α = Float64[0., 0.]
+    delta_αi = zeros(Float64,2,2)#Float64[0., 0.]
     configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins,0.0)    ### set the initial values for pr_spins and vm_a1x
     H_ab = create_H(vm_a1x)                                     ### Initiallize the matrix with the density of the configuration
     ### Initial evaluation of spin density 
@@ -192,40 +164,23 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
     #println(psi_GS)
     #psi_S[1,:] 
     if read_bias_file #& (i <= ti_bias)
-        delta_α::Vector{Float64} .= data_bias[1,:]
+        delta_αi[:,1] .= data_bias[1,:]
     else
-        delta_α .= [0. , 0.]
+        delta_αi .= zeros(Float64,2,2)#[0. , 0.]
     end
     ### Seting ODE for electrons-bath
-    prob = ODEProblem(eom!,rkvec, (0.0,t_end), [H_ab,delta_α] )         ### defines the problem for the differentia equation 
+    prob = ODEProblem(eom!,rkvec, (0.0,t_end), [H_ab,delta_αi] )         ### defines the problem for the differentia equation 
     integrator =  init(prob,Vern7(),dt=t_step, save_everystep=false,adaptive=true,dense=false)
     ### Open the files were the data is saved
-    if save_data_qsl["curr"]
-        cc_f = open("./data/cc_$(name)_jl.txt", "w+")
-    end
-    if save_data_qsl["scurr"]
-        sc_f = open("./data/sc_$(name)_jl.txt", "w+")
-    end
-    if save_data_qsl["sden_eq"]
-        seq_f = open("./data/seq_$(name)_jl.txt", "w+")
-    end
-    if save_data_qsl["sden_neq"]
-        sneq_f = open("./data/sneq_$(name)_jl.txt", "w+")
-    end
-    if save_data_qsl["rho"]
-        rkvec_f = open("./data/rkvec_$(name)_jl.txt", "w+")
-    end
-    if save_data_qsl["sclas"]
-        cspins_f = open("./data/cspins_$(name)_jl.txt", "w+")
-    end
+    save_data_qsl["curr"] && (cc_f = open("./data/cc_$(name)_jl.txt", "w+") )
+    save_data_qsl["scurr"] && (sc_f = open("./data/sc_$(name)_jl.txt", "w+") )
+    save_data_qsl["sden_eq"] && (seq_f = open("./data/seq_$(name)_jl.txt", "w+") )
+    save_data_qsl["sden_neq"] && (sneq_f = open("./data/sneq_$(name)_jl.txt", "w+") )
+    save_data_qsl["rho"] && (rkvec_f = open("./data/rkvec_$(name)_jl.txt", "w+") )
+    save_data_qsl["sclas"] && (cspins_f = open("./data/cspins_$(name)_jl.txt", "w+") )
     #### Spin liquid paramaters
-    if save_data_qsl["ent"]
-        entropy_f = open("./data/entropy_$(name)_sl_jl.txt", "w+")
-    end
-    if save_data_qsl["sden_qsl"]
-        sden_sl_f = open("./data/sden_$(name)_sl_jl.txt", "w+")
-    end
-
+    save_data_qsl["ent"] && (entropy_f = open("./data/entropy_$(name)_sl_jl.txt", "w+") )
+    save_data_qsl["sden_qsl"] && (sden_sl_f = open("./data/sden_$(name)_sl_jl.txt", "w+") )
     
     elapsed_time = @elapsed begin
     ### Time evolution loop 
@@ -250,81 +205,54 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
         sm_eq_a1x .= spindensity_eq(vm_a1x,energy_llg; t = 1.0, Temp = Temp )  ### spin density in eq
         diff .= sm_neq_a1x .- sm_eq_a1x      
         ### Now the magnetization is computed at time t + dt
-        if run_llg
-            vm_a1x .= heun(vm_a1x, diff,t_step,llg_parameters)        ### magnetization at time t+dt
-        end
+        run_llg && (vm_a1x .= heun(vm_a1x, diff,t_step,llg_parameters) )       ### magnetization at time t+dt
         ### at each time step 
         configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins,tt) 
         obs = Observables(integrator.u , params_0, false )
-        if save_data_qsl["curr"]
-            writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
-        end
-        if save_data_qsl["scurr"]
-            writedlm(sc_f, transpose(vcat(t,obs["scurr"]...) ), ' ' )
-        end
-        if save_data_qsl["sden_eq"]
-            writedlm(seq_f, transpose(vcat(t,sm_eq_a1x...) ), ' ' )
-        end
-        if save_data_qsl["sden_neq"]
-            writedlm(sneq_f, transpose(vcat(t,obs["sden"]...) ), ' ' )
-        end
-        if save_data_qsl["sclas"]
-            writedlm(cspins_f, transpose(vcat(t,vm_a1x...) ), ' ' )
-        end
+        save_data_qsl["curr"] && writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
+        save_data_qsl["scurr"] && writedlm(sc_f, transpose(vcat(t,obs["scurr"]...) ), ' ' )
+        save_data_qsl["sden_eq"] && writedlm(seq_f, transpose(vcat(t,sm_eq_a1x...) ), ' ' )
+        save_data_qsl["sden_neq"] && writedlm(sneq_f, transpose(vcat(t,obs["sden"]...) ), ' ' )
+        save_data_qsl["sclas"]&& writedlm(cspins_f, transpose(vcat(t,vm_a1x...) ), ' ' )
         if save_data_qsl["ent"]
         ### Entropy
             ent = Kf.basis.ent_entropy(psi_GS ,sub_sys_A=A,alpha=1,density=true)["Sent_A"][1]
             writedlm(entropy_f, transpose(vcat(t, ent  ) ), ' ' )
         end
         if save_data_qsl["sden_qsl"]
-        # Spin density
-        sden = real(Kf.spindensity_qsl(psi=psi_GS,sites=[0,1,2,3,4,5,6,7,8,9]))
-        writedlm(sden_sl_f, transpose(vcat(t, sden...) ), ' ' )
-                
+            # Spin density
+            sden = real(Kf.spindensity_qsl(psi=psi_GS,sites=[0,1,2,3,4,5,6,7,8,9]))
+            writedlm(sden_sl_f, transpose(vcat(t, sden...) ), ' ' )    
         end            
+            
         # Read bias file
         if read_bias_file #& (i <= ti_bias)
-            delta_α::Vector{Float64} .= data_bias[i+1,:]
+            delta_αi[:,1] .= data_bias[i+1,:]
         else
-            delta_α .= [0. , 0.]
+            delta_αi .= zeros(Float64,2,2)#[0. , 0.]
         end
         integrator.p[1] .= create_H(vm_a1x,vm_qsl_a1x)  
-        integrator.p[2] .=  delta_α#create_H(vm_a1x,vm_qsl_a1x) 
+        integrator.p[2] .=  delta_αi#create_H(vm_a1x,vm_qsl_a1x) 
         ### The Kitaev hamiltonian is updated with the expected values of the electronic spins
         H_k = Kf.Kitaev_H(alpha = θ,S = hcat(sm_neq_a1x...), Js = [1.0,1.0,1.0],J_coup = -J_qsl) #sm_neq_a1x
         ##E_S, psi_S = H_k.eigh() #.eigsh(which = "SA") 
     end ### end for the elapsed time
     end ### End for for
 
-    if save_data_qsl["curr"]
-        close(cc_f)
-    end
-    if save_data_qsl["scurr"]
-        close(sc_f)
-    end
-    if save_data_qsl["sden_eq"]
-        close(seq_f)
-    end
-    if save_data_qsl["sden_neq"]
-        close(sneq_f)
-    end
-    if save_data_qsl["sclas"]
-        close(cspins_f )
-    end
+    save_data_qsl["curr"] && close(cc_f)
+    save_data_qsl["scurr"] && close(sc_f)
+    save_data_qsl["sden_eq"] && close(seq_f)
+    save_data_qsl["sden_neq"] && close(sneq_f)
+    save_data_qsl["sclas"] && close(cspins_f)
     if save_data["rho"]
         #### save the last step of the rkvec 
         writedlm(rkvec_f, transpose(integrator.u ), ' ')
         close(rkvec_f)
     end
     ### spin liquid
-    if save_data_qsl["ent"]
-        ### Entropy
-        close(entropy_f)
-    end
-    if save_data_qsl["sden_qsl"]
-        # Spin density
-        close(sden_sl_f)
-    end       
+    save_data_qsl["ent"] && close(entropy_f)
+    ### Entropy
+    save_data_qsl["sden_qsl"] && close(sden_sl_f)
     println("Total time of simulation: ", elapsed_time, " s" )
     nothing
 end

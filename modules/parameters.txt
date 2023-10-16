@@ -1,12 +1,12 @@
 # Global parameters
-n = 5                              # number of sites
+n = 3                              # number of sites
 n_lorentz = 31                     # number of lorentzians
 n_channels = 2                     # number of channels (2 for full spin)
 delta_tdep_L = 0
 delta_tdep_R = 0
 E_F_system = 0.0
 V_bias = 0.0                       # Fermi energy and Vbias
-alpha_r = 0.5                      # Rashba parameter
+alpha_r = 0.0                      # Rashba parameter
 theta_1 =45.
 phi_1 =  0.0                       # Angles of sub lattice 1
 theta_2 = 12.9
@@ -19,12 +19,12 @@ Temp = 300.
 N_poles =  30                      # Temp, Npoles of the fermi function
 t_0 = 0.0
 t_step = 0.1
-t_end = 50                       # time to start step and end
+t_end = 100                       # time to start step and end
 # light flag
 J_sd = 0.1                         # jsd_to_llg from classical spin to H_el
-n_precessing = 5                   # number of spins precessing
+n_precessing = 0                   # number of spins precessing
 solver = "denis"
-cspin_orientation = "sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
+cspin_orientation =  "arb_dir"  #"sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
 # domain wall width
 # t_long time before start llg
 # t_bias time before start vbias
@@ -34,7 +34,7 @@ A = 0, 1, 2, 3, 4   # Sites where the entropy will be calculated for the spin li
 J_qsl = 0.0
 θ = pi   # pi is ferro, 0 is antiferro, and 3pi/2 is spin liquid
 ################################## Parameters in the llg equations
-n_sites = 5                       # number of LLG sites (equal to -1)
+n_sites = 3                       # number of LLG sites (equal to -1)
 nt = 1                            # number of time steps in llg
 dt = 0.1                          # time interval of a single LLG step
 h0 = 0.0, 0.0, 0.0              # external magnetic field vector
@@ -76,7 +76,8 @@ sden = true                       # save densities
 # spin_current_sfile
 # bond_currents_file
 # rho_file
-read_bias_file = false
+name = "test_pol_curr"
+read_bias_file = true
 bias_file = "./vtd.txt"
-name = "test_sym_pump"
+
 

@@ -136,7 +136,7 @@ if read_bias_file                                                              #
     const data_bias = readdlm(bias_file, ' ', Float64 )
     const ti_bias = size(data_bias)[1]#100                                                       ### steps to turn off the bias 
 else
-    const delta_α = [0., 0.]#[delta_tdep_L,delta_tdep_R]  
+    const delta_αi = zeros(Float64,2,2)#[0., 0.]#[delta_tdep_L,delta_tdep_R]  
 end
 # hi_αmk = zeros(ComplexF64, 2, 2,
 #         k_poles )                                                          ### χ Value that contain the poles of the lorentzians and fermi function

@@ -70,7 +70,7 @@ function eom!(du, u, p, t)
 #     drho_ab = zeros(ComplexF64, 2*n, 2*n )
 
     H_ab::Array{ComplexF64} = p[1]
-    delta_α::Vector{Float64} = p[2]
+    delta_αi::Matrix{Float64} = p[2]
     
     Pi_abα = zeros(ComplexF64, 2*n, 2*n, 2 )
     ## Preallocation of the variables to be used 
@@ -89,8 +89,8 @@ function eom!(du, u, p, t)
     @tullio dOmega_αik1βjp1[α,i,k1+0,β,j,p1+0] += conj(psi_aikα[a,j,p1,β])*csi_aikα[a,i,k1,α]*(Gam_greater_αmik[α,2,i,k1] 
                                                 - Gam_lesser_αmik[α,2,i,k1] ) 
     
-    @tullio dOmega_αik1βjp1[α,i,k1+0,β,j,p1+0] +=-1im/$hbar*(hi_αmk[β,1,p1] + delta_α[β]
-                                          -(hi_αmk[α,2,k1] + delta_α[α]) )*Omega_αik1βjp1[α,i,k1,β,j,p1]
+    @tullio dOmega_αik1βjp1[α,i,k1+0,β,j,p1+0] +=-1im/$hbar*(hi_αmk[β,1,p1] + delta_αi[β,j]
+                                          -(hi_αmk[α,2,k1] + delta_αi[α,i]) )*Omega_αik1βjp1[α,i,k1,β,j,p1]
     
     du[1:size_Omega1] .= vec(dOmega_αik1βjp1)
     
@@ -102,7 +102,7 @@ function eom!(du, u, p, t)
     @tullio dOmega_αik1βjp2[α,i,k1+0,β,j,p2] += conj( psi_aikα[a,j,$n_lorentz + p2,β])*csi_aikα[a,i,k1,α]*(Gam_greater_αmik[α,2,i,k1] 
                                             - Gam_lesser_αmik[α,2,i,k1] )
     @tullio dOmega_αik1βjp2[α,i,k1+0,β,j,p2] +=  -1im/$hbar*(hi_αmk[β,1,$n_lorentz+ p2] 
-                                + delta_α[β] - ( hi_αmk[α,2,k1] + delta_α[α]  ) )*Omega_αik1βjp2[α,i,k1,β,j, p2]
+                                + delta_αi[β,j] - ( hi_αmk[α,2,k1] + delta_αi[α,i]  ) )*Omega_αik1βjp2[α,i,k1,β,j, p2]
     
     du[size_Omega1 + 1 : size_Omega1 + size_Omega2 ] .= vec(dOmega_αik1βjp2)
 
@@ -111,8 +111,8 @@ function eom!(du, u, p, t)
     end
     @tullio dOmega_αik2βjp1[α,i,k2+0,β,j,p1+0] += conj(psi_aikα[a,j,p1,β])*csi_aikα[a,i,$n_lorentz + k2,α]*(Gam_greater_αmik[α,2,i,$n_lorentz  + k2] 
                                     - Gam_lesser_αmik[α,2,i,$n_lorentz  + k2] )
-    @tullio dOmega_αik2βjp1[α,i,k2+0,β,j,p1+0] += -1im/$hbar*(hi_αmk[β,1,p1] + delta_α[β] 
-                                - ( hi_αmk[α,2,$n_lorentz+k2] + delta_α[α]  ) )*Omega_αik2βjp1[α,i,k2,β,j,p1] 
+    @tullio dOmega_αik2βjp1[α,i,k2+0,β,j,p1+0] += -1im/$hbar*(hi_αmk[β,1,p1] + delta_αi[β,j] 
+                                - ( hi_αmk[α,2,$n_lorentz+k2] + delta_αi[α,i]  ) )*Omega_αik2βjp1[α,i,k2,β,j,p1] 
     
     du[size_Omega1 + size_Omega2 + 1 : size_Omega1 + size_Omega2 + size_Omega3] .= vec(dOmega_αik2βjp1)
 
@@ -128,7 +128,7 @@ function eom!(du, u, p, t)
          Omega_αik2βjp1[α,i,k2,β,j,p1+0]*csi_aikα[a,j,p1,β]
     end
     #### in this case the sum must be splitted due to the sum over index i
-    @tullio dpsi_aikα[a,i,k,α] = -1im*Gam_lesser_αmik[α,2,i,k]*csi_aikα[a,i,k,α] + 1im/$hbar*(hi_αmk[α,2,k]+ delta_α[α])*psi_aikα[a,i,k,α]  ## check
+    @tullio dpsi_aikα[a,i,k,α] = -1im*Gam_lesser_αmik[α,2,i,k]*csi_aikα[a,i,k,α] + 1im/$hbar*(hi_αmk[α,2,k]+ delta_αi[α,i])*psi_aikα[a,i,k,α]  ## check
     @tullio  dpsi_aikα[a,i,k,α] += -1im*rho_ab[a,b]*csi_aikα[b,i,k,α]*(Gam_greater_αmik[α,2,i,k] - Gam_lesser_αmik[α,2,i,k]) ##SEMIcheck or not sure by rho
     @tullio  dpsi_aikα[a,i,k,α] += -1im/$hbar*H_ab[a,b]*psi_aikα[b,i,k,α] ### check
     
