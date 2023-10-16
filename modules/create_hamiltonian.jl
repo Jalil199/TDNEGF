@@ -1,8 +1,10 @@
 module create_hamiltonian
 ### Libraries
 using LinearAlgebra
-include("parameters.jl")
-using .parameters
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
 include("derived_constants.jl")
 using .derived_constants
 

@@ -2,8 +2,10 @@ module dynamical_variables
 ### Libraries
 using LinearAlgebra          ### Linear algebra library
 using Tullio                 ### Library to work with tensors
-include("parameters.jl")
-using .parameters
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
 ###include("derived_constants.jl")
 ###using .derived_constants
 

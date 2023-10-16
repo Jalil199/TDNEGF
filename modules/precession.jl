@@ -1,8 +1,10 @@
 module precession
 #export PrecSpin, update!
 ### Libraries
-include("parameters.jl")
-using .parameters
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
 
 mutable struct PrecSpin
     """ This mutable structure act like a class 

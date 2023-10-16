@@ -3,8 +3,10 @@ export get_poles
 
 ### Libraries
 using LinearAlgebra
-include("parameters.jl")
-using .parameters
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
 
 function get_poles(local_dim = n_channels*N_poles)
     """This function calculates the poles and residues of the Ozaki decomposotion of 

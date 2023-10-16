@@ -1,9 +1,11 @@
 module llg
 ### Libraries
 using LinearAlgebra          ### Linear algebra library
-include("parameters.jl")
-using .parameters
-
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
+#println(typeof(n_sites))
 mutable struct llg_parameters
     """ Here are contained the main parameters of the LLG evolution
     """

@@ -1,9 +1,11 @@
 module observables 
 using LinearAlgebra     ### Linear algebra library
 using Tullio            ### Library to work with tensors
-#include("parameters.jl")
-include("./modules/get_parameters.jl")
+
+include("get_parameters.jl")
 using .get_parameters
+##include("parameters.jl")
+##using .parameters
 include("derived_constants.jl")
 using .derived_constants
 include("equation_of_motion.jl")

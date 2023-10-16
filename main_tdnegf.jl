@@ -33,7 +33,7 @@ println("Modules were  loaded")
 #push!(LOAD_PATH, "/home/jalil/Projects2023/TDNEGF/TDNEGF/modules/")
 #using .parameters
 import .read_parameters: read_params
-read_params(;archivo_parametros= "./modules/parameters.txt")
+read_params(;archivo_parametros= "./modules/$(ARGS[1]).txt")
 using .get_parameters
 using .derived_constants
 import .configuration: configure!
@@ -291,7 +291,7 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
         integrator.p[1] .= create_H(vm_a1x,vm_qsl_a1x)  
         integrator.p[2] .=  delta_α#create_H(vm_a1x,vm_qsl_a1x) 
         ### The Kitaev hamiltonian is updated with the expected values of the electronic spins
-        H_k = Kf.Kitaev_H(alpha = θ,S = hcat(sm_neq_a1x...), Js = [1.0,1.0,1.0],J_coup = J_qsl) #sm_neq_a1x
+        H_k = Kf.Kitaev_H(alpha = θ,S = hcat(sm_neq_a1x...), Js = [1.0,1.0,1.0],J_coup = -J_qsl) #sm_neq_a1x
         ##E_S, psi_S = H_k.eigh() #.eigsh(which = "SA") 
     end ### end for the elapsed time
     end ### End for for

@@ -3,8 +3,12 @@ export Eig_vals, Res_p,Eig_vals_k2α,hi_αmk, R_k2α,
        hi_αmk1,hi_αmk2,Gam_greater_αmik, Gam_lesser_αmik,
        csi_aikα
 
-include("parameters.jl")
-using .parameters
+#include("parameters.jl")
+#using .parameters
+
+include("get_parameters.jl")
+using .get_parameters
+
 include("osaki_poles.jl")
 import .osaki_poles: get_poles
 include("dynamical_variables.jl")

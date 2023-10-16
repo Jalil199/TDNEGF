@@ -2,8 +2,10 @@ module configuration
 
 ### Libraries
 using LinearAlgebra
-include("parameters.jl")
-using .parameters
+include("get_parameters.jl")
+using .get_parameters
+# include("parameters.jl")
+# using .parameters
 include("precession.jl")
 import .precession: PrecSpin, update!
 

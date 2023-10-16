@@ -1,7 +1,9 @@
 module green_functions
 ### Libraries
-include("parameters.jl")
-using .parameters
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
 include("create_hamiltonian.jl")
 import .create_hamiltonian: create_H
 

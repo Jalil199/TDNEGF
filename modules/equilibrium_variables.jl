@@ -1,7 +1,9 @@
 module equilibrium_variables
 ### Libraries
-include("parameters.jl")
-using .parameters
+# include("parameters.jl")
+# using .parameters
+include("get_parameters.jl")
+using .get_parameters
 include("green_functions.jl")
 import .green_functions: green
 include("observables.jl")
