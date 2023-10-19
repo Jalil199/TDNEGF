@@ -19,7 +19,7 @@ Temp = 300.
 N_poles =  30                      # Temp, Npoles of the fermi function
 t_0 = 0.0
 t_step = 0.1
-t_end = 100                       # time to start step and end
+t_end = 10000                       # time to start step and end
 # light flag
 J_sd = 0.1                         # jsd_to_llg from classical spin to H_el
 n_precessing = 5                   # number of spins precessing
