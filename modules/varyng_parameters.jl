@@ -1,6 +1,6 @@
 phases = [pi, 0.0, 3pi/2]
 periods = [600, 300, 150, 100]
-Jqs = [0.08, 0.1, 0.12]
+Jqs = [0.02,0.04,0.06,0.08, 0.1, 0.12,0.14,0.16,0.18,0.2]
 
 # Include the 'using' statement for 'contains'
 using Base.Iterators: contains
