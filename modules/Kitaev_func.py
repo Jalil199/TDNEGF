@@ -51,15 +51,16 @@ def Kitaev_H(alpha = 1, S = np.zeros([3,3]) , Js = [1.0,1.0,1.0], J_coup = 1.0 )
                       ["yy",J_xyy],["zz",J_xzz]]
     operator_dict = dict(H0=operator_list_0,H1 = operator_list_1)
     ### Parameter that controls the HK model 
+    #print("pass until before params",np.sin(3),alpha)
     params_dict = dict(H0=np.sin(alpha)+np.cos(alpha),H1=np.cos(alpha))
     #(np.zeros([3,3]) !== 0).any()
     #[:,1]
     # print("bool_val :",(S != 0).any())
     if (S != 0.).any() :
         ##print("join " ,S )
-        J_x = [ [S[0,0] , 6], [S[0,1]  , 7], [S[0,2],  8]  ]
-        J_y = [ [S[1,0] , 6], [S[1,1]  , 7], [S[1,2],  8]  ]
-        J_z = [ [S[2,0] , 6], [S[2,1]  , 7], [S[2,2],  8]  ]
+        J_x = [ [S[0,0] , 5], [S[0,1]  , 6], [S[0,2],  7], [S[0,3], 8 ], [S[0,4],  9]  ]
+        J_y = [ [S[1,0] , 5], [S[1,1]  , 6], [S[1,2],  7], [S[1,3], 8 ], [S[1,4],  9]  ]
+        J_z = [ [S[2,0] , 5], [S[2,1]  , 6], [S[2,2],  7], [S[2,3], 8 ], [S[2,4],  9]  ]
         operator_list_3 = [["z", J_z  ], ['x', J_x  ], ['y', J_y ] ]
         operator_dict = dict(H0=operator_list_0,H1=operator_list_1,Hcoup=operator_list_3)
         params_dict = dict(H0=np.sin(alpha)+np.cos(alpha),H1=np.cos(alpha), Hcoup = -J_coup)

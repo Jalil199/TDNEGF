@@ -60,7 +60,63 @@ function configure!(cname, llg_params, vm_a1x, pr_spins, t )
             update!(pr_spins[j], t )
             vm_a1x[pr_spins[j].i ] .= pr_spins[j].s
         end   
-    end 
+    end
+    ##############################################################################
+        if cname == "precess_release"
+        ### Global parameters ares modified
+        #####################################
+        ### Modify the local parameters in the electron Hamiltonian
+        J_sd_local .= J_sd.*ones(n) 
+        thop_local .= thop.*ones(n-1) 
+        ### Modify the llg parameter (Note that more parameters can be modified around the evolution)
+        ## Notice that j_sd is taken from the global parameters but it can be modified
+        llg_params().js_exc .= ones(Float64, n_sites-1)*j_exc
+        llg_params().js_sd .= ones(Float64, n_sites)*j_sd
+        #####################################
+        if t == 0.0 #### Initial conditions 
+            println("join configuration: $(cname)")
+            for jj in 1: n::Int  ### Run over the number of sites of the lattice 
+                vm_a1x[jj][1] = 0.
+                vm_a1x[jj][2] = 0.
+                vm_a1x[jj][3] = 1.
+            end
+            for jj in 1: n_precessing::Int 
+                pr_spins[jj].i = jj ## lattice site 
+                pr_spins[jj].theta_zero = theta_1
+                pr_spins[jj].axis_phi = phi_1
+                pr_spins[jj].T = period 
+                #println(pr_spins[jj].i)
+            end
+        #####################################
+        ### Modify the local parameters in the electron Hamiltonian
+        J_sd_local .= J_sd.*ones(n) 
+        thop_local .= thop.*ones(n-1) 
+        ### Modify the llg parameter (Note that more parameters can be modified around the evolution)
+        ## Notice that j_sd is taken from the global parameters but it can be modified
+        llg_params().js_exc .= ones(Float64, n_sites-1)*j_exc
+        llg_params().js_sd .= ones(Float64, n_sites)*j_sd
+        #####################################
+        end
+
+        
+        ### Notice that the range of the spins that are precessing can be modified
+        for j in 1:n_precessing#length(pr_spins) 1:1:5
+            update!(pr_spins[j], t )
+            vm_a1x[pr_spins[j].i ] .= pr_spins[j].s
+        end   
+
+	if t >= t_end//2
+	   for j in 1:n
+               vm_a1x[j] .= [0.,0.,0.]
+
+           end
+        end 
+		
+    end
+ 	
+
+
+ 
     ##############################################################################
     if cname == "precess"
         ### Global parameters ares modified

@@ -72,7 +72,7 @@ function main()
     end
     ### Seting ODE for electrons-bath
     prob = ODEProblem(eom!,rkvec, (0.0,t_end), [H_ab,delta_αi] )         ### defines the problem for the differentia equation 
-    println(123)
+    #println(123)
     ### Open the files were the data is saved
     save_data["curr"] && (cc_f = open("./data/cc_$(name)_jl.txt", "w+") )
     save_data["scurr"] && (sc_f = open("./data/sc_$(name)_jl.txt", "w+") )
@@ -136,6 +136,8 @@ end
 ##############################################################################################
 using Pkg
 using PyCall                 ### In case that quspin will be used
+#Pkg.add("Conda")
+#Pkg.build("PyCall")
 pushfirst!(PyVector(pyimport("sys")."path"), "./modules/") ### link to my own python modules 
 Kf= pyimport("Kitaev_func")
 np = pyimport("numpy")
@@ -157,7 +159,7 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
     ### Parameters of the system in equilibirum 
     poles_denis, res_denis = init_denis(mu = E_F_system,temp=Temp,e_min=-3.,p=21)
     ### Compute the Eigen values and the GS of the Kitaev model
-    H_k = Kf.Kitaev_H(alpha = θ, Js = [1.,1.,1.],J_coup = J_qsl) ### the system is initially at heisenberg
+    H_k = Kf.Kitaev_H(alpha = θ, Js = [1.,1.,1.],J_coup = 	J_qsl) ### the system is initially at heisenberg
     E_S, psi_S = np.linalg.eig(H_k.toarray())  ### Compute the eigen values and the eigen vectors
     #H_k.eigh()#.eigsh(which = "SA")#.eigsh(k = 1,which = "SA") 
     psi_GS = psi_S[:,1]   ### Just take the first eigen value
@@ -195,12 +197,12 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
         #psi_GS = vec(ED_state_vs_time_f(psi_GS, E_S,psi_S, np.array([0.1*hbar]) ) )#,iterate=False) hbar is because in the quspin svol hbar=1
         psi_GS = vec(Kf.evolve(H_static=H_k, H_dynamic=[], psi=psi_GS, dt=0.1, method= "CN", time_dep=0) )
         #### Evaluation of spin densities
-        m_qsl = real(Kf.spindensity_qsl(psi=psi_GS,sites=[5,6,7])    )
+        m_qsl = real(Kf.spindensity_qsl(psi=psi_GS,sites=[5,6,7,8,9])    )
         #### Note that this only returns 3 spin spin densities, then 
         ### we must acomodate the hilbert space in order to couple this to 
         ### the hilbert space of the electrons
-        vm_qsl_a1x = [real(m_qsl[i, :]) for i in 1:3 ]#:: Int]                 ### spin density of qsl
-        pushfirst!(vm_qsl_a1x, [zeros(Float64,3) for _ in 1:6]... )              ### the fisrt 3 sites of the electron lattice is not coupled
+        vm_qsl_a1x = [real(m_qsl[i, :]) for i in 1:5 ]#:: Int]                 ### spin density of qsl
+        ## pushfirst!(vm_qsl_a1x, [zeros(Float64,3) for _ in 1:6]... )              ### the fisrt 3 sites of the electron lattice is not coupled
         sm_neq_a1x .= Observables(integrator.u , params_0, false )["sden"]     ### update the spin density for electrons  
         sm_eq_a1x .= spindensity_eq(vm_a1x,energy_llg; t = 1.0, Temp = Temp )  ### spin density in eq
         diff .= sm_neq_a1x .- sm_eq_a1x      
@@ -234,7 +236,7 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
         integrator.p[1] .= create_H(vm_a1x,vm_qsl_a1x)  
         integrator.p[2] .=  delta_αi#create_H(vm_a1x,vm_qsl_a1x) 
         ### The Kitaev hamiltonian is updated with the expected values of the electronic spins
-        H_k = Kf.Kitaev_H(alpha = θ,S = hcat(sm_neq_a1x...), Js = [1.0,1.0,1.0],J_coup = -J_qsl) #sm_neq_a1x
+        H_k = Kf.Kitaev_H(alpha = θ,S = hcat(sm_neq_a1x...), Js = [1.0,1.0,1.0],J_coup = J_qsl) #sm_neq_a1x
         ##E_S, psi_S = H_k.eigh() #.eigsh(which = "SA") 
     end ### end for the elapsed time
     end ### End for for
@@ -260,6 +262,6 @@ end
 
 ###############################################################################################
 if abspath(PROGRAM_FILE) == @__FILE__
-    main()
-    #main_qsl()
+   main()
+  # main_qsl()
 end

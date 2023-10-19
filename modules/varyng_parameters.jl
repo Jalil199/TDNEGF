@@ -1,33 +1,43 @@
-# Number of different n values to generate
-num_values = 2
+phases = [pi, 0.0, 3pi/2]
+periods = [600, 300, 150, 100]
+Jqs = [0.08, 0.1, 0.12]
+
+# Include the 'using' statement for 'contains'
+using Base.Iterators: contains
 
 # Loop over different n values
-for i in 1:num_values
-    n_value = i * 2  # You can adjust this calculation as needed
+for phase in phases
+    for period in periods
+        for Jq in Jqs
+            # Open the original parameters file
+            original_filename = "parameters.txt"
+            open(original_filename, "r") do file
+                # Create a new file for the modified parameters
+                round_phase = round(phase, digits=2)
+                modified_filename = "P$(round_phase)_T$(period)_Jq$(Jq).txt"
+                new_file = open(modified_filename, "w")
 
-    # Open the original parameters file
-    original_filename = "parameters.txt"
-    open(original_filename, "r") do file
-        # Create a new file for the modified parameters
-        modified_filename = "parameters_n_$n_value.txt"
-        new_file = open(modified_filename, "w")
+                # Loop through lines in the original file
+                for line in eachline(file)
+                    if contains(line, "θ = ")
+                        modified_line = "θ = $(phase)"
+                    elseif contains(line, "J_qsl = ")
+                        modified_line = "J_qsl = $(Jq) "
+                    elseif contains(line, "period = ")
+                        modified_line = "period = $(period)"
+                    elseif contains(line, "name = ")
+                        modified_line = "name = $(modified_filename)"
+                    else
+                        modified_line = line
+                    end
 
-        # Loop through lines in the original file
-        for line in eachline(file)
-            # Check if the line contains "n ="
-            if contains(line, "n =")
-                # Modify the line with the new n value
-                modified_line = "n = $n_value"
-            else
-                # Keep the line as-is
-                modified_line = line
+                    println(new_file, modified_line)
+                end
+
+                # Close the new file
+                close(new_file)
             end
-
-            # Write the modified line to the new file
-            println(new_file, modified_line)
         end
-
-        # Close the new file
-        close(new_file)
     end
 end
+
