@@ -1,5 +1,5 @@
 # Global parameters
-n = 5                              # number of sites
+n = 10                            # number of sites
 n_lorentz = 31                     # number of lorentzians
 n_channels = 2                     # number of channels (2 for full spin)
 delta_tdep_L = 0
@@ -7,7 +7,7 @@ delta_tdep_R = 0
 E_F_system = 0.0
 V_bias = 0.0                       # Fermi energy and Vbias
 alpha_r = 0.0                      # Rashba parameter
-theta_1 =45.
+theta_1 = 45.
 phi_1 =  0.0                       # Angles of sub lattice 1
 theta_2 = 12.9
 phi_2 =  0.0                       # Angles of sub lattice 2
@@ -19,28 +19,28 @@ Temp = 300.
 N_poles =  30                      # Temp, Npoles of the fermi function
 t_0 = 0.0
 t_step = 0.1
-t_end = 10000                       # time to start step and end
+t_end = 1400 #400 #200#5000 #400                       # time to start step and end
 # light flag
-J_sd = 0.1                         # jsd_to_llg from classical spin to H_el
-n_precessing = 5                   # number of spins precessing
+J_sd = 0.2                         # jsd_to_llg from classical spin to H_el
+n_precessing = 0                   # number of spins precessing
 solver = "denis"
-cspin_orientation = "precess_release" # "arb_dir"  #"sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
+cspin_orientation = "arb_dir" #"precess_release" # "arb_dir"  #"sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
 # domain wall width
 # t_long time before start llg
 # t_bias time before start vbias
 # llg_step Num of TDNEGF steps between LLG
 ################################## Parameters for the spin liquid
 A = 0, 1, 2, 3, 4   # Sites where the entropy will be calculated for the spin liquid
-J_qsl = 0.1
-θ = 3.141592653589793  # #_pi   # pi is ferro, 0 is antiferro, and 3pi/2 is spin liquid
+J_qsl = 0.4
+θ =  0.0#4.71238898038469 #0.0 #3.141592653589793 #4.71238898038469 #0.0 ##3.141592653589793  # #_pi   # pi is ferro, 0 is antiferro, and 3pi/2 is spin liquid
 ################################## Parameters in the llg equations
-n_sites = 5                       # number of LLG sites (equal to -1)
+n_sites = 10                       # number of LLG sites (equal to -1)
 nt = 1                            # number of time steps in llg
 dt = 0.1                          # time interval of a single LLG step
 h0 = 0.0, 0.0, 0.0              # external magnetic field vector
 j_exc = 0.0                       # jexc coupling between classical spins
 g_lambda = 0.0                    # gilbert damping factor
-j_sd = 0.1                        # jsd in the llg equation
+j_sd = 0.2                        # jsd in the llg equation
 j_dmi = 0.0                       # Dyaloshinski-Moriya
 j_ani = 0.0                       # Magnetic anisotropy
 j_dem = 0.0                       # Demagnetization field
@@ -53,10 +53,17 @@ p_theta = 0.0                     # polarizer vector theta
 p_phi = 0.0                       # polarizer vector phi
 run_llg = false
 ################################### Save and replay
-save_curr = true
-save_scurr = true                 # save currents
+#save_curr = true
+#save_scurr = true                 # save currents
+curr = true
+scurr = true
+sden_eq = true
+sden_neq = true
 rho = true
 sden = true                       # save densities
+sclas = true
+ent = true
+sden_qsl = true
 # replay_llg
 # replay_cspins_file
 # save_cspins
@@ -65,7 +72,8 @@ sden = true                       # save densities
 # save_charge_current
 # save_spin_currents
 # save_rho
-# preload_rkvec
+preload_rkvec = false
+name_preload_rkvec = rkvec_eq_state_soc_jl.txt # rkvec_test_jl.txt
 # save_rkvec_end
 # read_bias
 ### name of the txt file 
@@ -76,8 +84,8 @@ sden = true                       # save densities
 # spin_current_sfile
 # bond_currents_file
 # rho_file
-name = "names"
+name = around_x #eq_state_nosoc#test ##NiPt5_nosoc #Ni2 #test #curr_gene2_soc #qsl_test_2_fe #pumping_check_norm_nosoc #qsl_test_fe   # names
 read_bias_file = false
-bias_file = "./vtd.txt"
+bias_file = vtd.txt
 
 
