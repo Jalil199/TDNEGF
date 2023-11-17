@@ -54,14 +54,17 @@ function update!(this, time)#(this::PrecSpin, time  )
     sz = cos(otheta)
     sx = cos(ophi+ omega*t)*sin(otheta)
     sy = sin(ophi+ omega*t)*sin(otheta)
-    # Now rotate along y 
+    #Now rotate along y 
     atheta = pi * this.axis_theta/ 180.
     aphi = pi * this.axis_phi / 180. 
     sx = sx*cos(atheta) - sz* sin(atheta)
     sz = sx* sin(atheta) + sz*cos(atheta)
-    # No rotate along the z 
+    #No rotate along the z 
     sx = sx*cos(aphi) + sy*sin(aphi)
     sy = -sx*sin(aphi) + sy*cos(aphi)
+    # sx = 0.
+    # sy = 0. 
+    # sz = 1. + sin(omega*t)*0.5 
     this.s .= [sx, sy, sz]
     nothing
 end

@@ -44,8 +44,9 @@ import .observables: Observables
 import .equilibrium_variables: init_denis, spindensity_eq
 import .equation_of_motion: eom!
 println("Parameters were loaded")
-
-
+    
+    # data =readdlm("./M_NiPt.out")
+    
 function main()
     ### Initiallize the variables in the dynamics
     rkvec = zeros(ComplexF64, size_rkvec)
@@ -54,6 +55,7 @@ function main()
     sm_eq_a1x = [zeros(Float64,3) for _ in 1:n] 
     diff = [zeros(Float64,3) for _ in 1:n]
     delta_αi = zeros(Float64,2,2)#Float64[0. , 0.]
+    
     ### Set the initial configuration of the classical spins
     configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins, 0.0) ### set the initial values for pr_spins and vm_a1x
     H_ab = create_H(vm_a1x)                                             ### Initiallize the hamiltonian
@@ -70,6 +72,8 @@ function main()
     else
         delta_αi .= zeros(Float64,2,2)#[0. , 0.]
     end
+    preload_rkvec &&   (rkvec = readdlm("./data/rkvec_test_jl.txt",',', ComplexF64) )
+    println("preload rkvec file : " , preload_rkvec, ", with name : ", name_preload_rkvec)
     ### Seting ODE for electrons-bath
     prob = ODEProblem(eom!,rkvec, (0.0,t_end), [H_ab,delta_αi] )         ### defines the problem for the differentia equation 
     #println(123)
@@ -84,7 +88,8 @@ function main()
     integrator =  init(prob,Vern7(),dt=t_step, save_everystep=false,adaptive=true,dense=false)
     #,reltol=1e-12,abstol=1e-12)#,dt=t_step,reltol=1e-6,abstol=1e-6 )
     elapsed_time = @elapsed begin
-    ### For loop for the evolution of a single step
+    ## For loop for the evolution of a single step
+       j=0
     for (i,t) in enumerate(t_0:t_step:(t_end-t_step) )
         tt = round((i)*t_step,digits=2)
         println("time: ", tt  )
@@ -99,6 +104,21 @@ function main()
         ### Depending of the configuration, it modifies the configuration of the system
         ### at each time step 
         configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins,tt) 
+            ### added to see the evl
+            
+            # if tt <= 1000#5075
+            #     vm_a1x = [[1.,0.,0.] for _ in 1:n]
+            # else
+            #     try
+            #         vm_a1x = [[data[1+j*42,1],0.,0.] for _ in 1:n]   #### component 2 for Ni 
+            #         j=j+1
+            #     catch
+            #         j=j-1
+            #         vm_a1x = [[data[1+j*42,1],0.,0.] for _ in 1:n]
+                    
+            #     end
+            # end
+            
         ### Calculate the needed observables at each time step 
         obs = Observables(integrator.u , params_0, false )
         save_data["curr"] && writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
@@ -127,7 +147,7 @@ function main()
     save_data["sclas"] && close(cspins_f )
     if save_data["rho"]
         #### save the last step of the rkvec 
-        writedlm(rkvec_f, transpose(integrator.u ), ' ')
+        writedlm(rkvec_f, integrator.u, ',' )
         close(rkvec_f)
     end
     println("Total time of simulation: ", elapsed_time, " s" )
@@ -166,7 +186,9 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
     #println(psi_GS)
     #psi_S[1,:] 
     if read_bias_file #& (i <= ti_bias)
-        delta_αi[:,1] .= data_bias[1,:]
+        #delta_αi[:,1] .= data_bias[1,:]
+        delta_αi[1,1] = data_bias[1,1]
+        delta_αi[2,2] = data_bias[1,1]
     else
         delta_αi .= zeros(Float64,2,2)#[0. , 0.]
     end
@@ -223,13 +245,17 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
         end
         if save_data_qsl["sden_qsl"]
             # Spin density
-            sden = real(Kf.spindensity_qsl(psi=psi_GS,sites=[0,1,2,3,4,5,6,7,8,9]))
+            sden_save= Kf.spindensity_qsl(psi=psi_GS,sites=[0,1,2,3,4,5,6,7,8,9])
+            sden = [real(sden_save[i, :]) for i in 1:10 ]
+            #real(Kf.spindensity_qsl(psi=psi_GS,sites=[0,1,2,3,4,5,6,7,8,9]))
             writedlm(sden_sl_f, transpose(vcat(t, sden...) ), ' ' )    
         end            
             
         # Read bias file
         if read_bias_file #& (i <= ti_bias)
-            delta_αi[:,1] .= data_bias[i+1,:]
+            #delta_αi[:,1] .= data_bias[i+1,:]
+            delta_αi[1,1] = data_bias[i+1,1]
+            delta_αi[2,2] = data_bias[i+1,1]
         else
             delta_αi .= zeros(Float64,2,2)#[0. , 0.]
         end
@@ -262,6 +288,6 @@ end
 
 ###############################################################################################
 if abspath(PROGRAM_FILE) == @__FILE__
-   #main()
-   main_qsl()
+   main()
+   #main_qsl()
 end

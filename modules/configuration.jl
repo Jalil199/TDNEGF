@@ -32,7 +32,7 @@ function configure!(cname, llg_params, vm_a1x, pr_spins, t )
             println("join configuration: $(cname)")
                     ### Initiallize the values 
             for jj in 1: n::Int  ### Run over the number of sites of the lattice 
-                vm_a1x[jj][1] = 0.
+                vm_a1x[jj][1] = 1.
                 vm_a1x[jj][2] = 0.
                 vm_a1x[jj][3] = 0.
             end

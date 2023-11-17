@@ -12,8 +12,8 @@ export n, n_lorentz,n_channels,delta_tdep_L,delta_tdep_R,E_F_system, V_bias,
        E_F_left, E_F_right,alpha_r,theta_1,phi_1,theta_2,phi_2,period,N_rash,
        Temp, N_poles,t_0,t_step,t_end,J_sd,n_precessing,J_qsl,A,θ,save_data_qsl,data_bias,
        n_sites,nt,dt,h0,j_exc,g_lambda,j_sd,j_dmi,j_ani,j_dem,e,e_demag,js_pol,js_ana,thop,
-       p_theta,p_phi,curr,scurr,rho,sden,solver,cspin_orientation,read_bias_file,
-       bias_file,name,save_data, run_llg
+       p_theta,p_phi,curr,scurr,rho,sden_eq, sden_neq,sden_qsl,sclas,solver,cspin_orientation,read_bias_file,
+       bias_file,name,save_data, run_llg, preload_rkvec, name_preload_rkvec
 ### Secondary parameters
 export w0_k1α,eps_k1α,gam_k1iα,k_poles,energy_llg,E_F_α,beta,
        dims_Omega1, dims_Omega2, dims_Omega3, size_Omega1, 
@@ -70,20 +70,28 @@ const run_llg = get(loaded_parameters, "run_llg", false)
 const curr = get(loaded_parameters, "curr", true)
 const scurr = get(loaded_parameters, "scurr", true)
 const rho = get(loaded_parameters, "rho", true)
+const sden_eq = get(loaded_parameters, "sden_eq", true)
 const sden = get(loaded_parameters, "sden", true)
+const sden_neq = get(loaded_parameters, "sden_neq", true)
+const sden_qsl = get(loaded_parameters, "sden_qsl", true)
+const sclas = get(loaded_parameters, "sclas", true)
+const ent = get(loaded_parameters, "ent", true)
 const solver = get(loaded_parameters, "solver", "denis")
 const cspin_orientation = get(loaded_parameters, "cspin_orientation", "sym_pump")
 const bias_file = get(loaded_parameters, "bias_file", "./vtd.txt")
-const read_bias_file = get(loaded_parameters, "read_bias_file", "false")
+const read_bias_file = get(loaded_parameters, "read_bias_file", false)
 const name = get(loaded_parameters, "name", "test_sym_pump")
+const preload_rkvec = get(loaded_parameters, "preload_rkvec", true)
+const name_preload_rkvec = get(loaded_parameters,"name_preload_rkvec", "rkvec_test_jl.txt" )
 
 #### Derived parameters 
 ##############################################################################################################
 const E_F_left = E_F_system + 0.5 * V_bias
 const E_F_right = E_F_system - 0.5 * V_bias
-const save_data = Dict("curr" => true, "scurr" => true, "sden_eq" => true, "sden_neq" => true, "rho" => true, "sclas" => true)
-const save_data_qsl = Dict("curr" => true, "scurr" => true, "sden_eq" => true, "sden_neq" => true,
-                     "rho" => true, "sclas" => true, "ent" => true, "sden_qsl" => true)
+const save_data = Dict("curr" => curr, "scurr" => scurr, "sden_eq" => sden_eq, "sden_neq" => sden_neq,
+                        "rho" => rho, "sclas" => sclas)
+const save_data_qsl = Dict("curr" => curr, "scurr" => scurr, "sden_eq" => sden_eq, "sden_neq" => sden_neq,
+                     "rho" => rho, "sclas" => sclas, "ent" => ent, "sden_qsl" => sden_qsl)
 data_fit_pdbest = readdlm( "./selfenergy/selfenergy_1DTB_NNLS_31_pbest.csv" , ',', Float64)
 data_fit_Ulsq = readdlm( "./selfenergy/selfenergy_1DTB_NNLS_31_Ulsq.csv", ',', Float64) ;
 ### Elementary matrices
