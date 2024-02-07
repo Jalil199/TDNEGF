@@ -10,8 +10,13 @@ include("derived_constants.jl")
 using .derived_constants
 include("equation_of_motion.jl")
 import .equation_of_motion: to_matrix
+# include("green_functions.jl")
+# import .green_functions: green
+# include("equilibrium_variables.jl")
+# import .equilirbrium_variables: rho_denis
 
-function Observables(vector,params=params,just_rho = false)
+
+function Observables(vector,params=params,just_rho = false)#; vm_a1x =  [zeros(Float64,3) for _ in 1:n], H_ab = zeros(ComplexF64,2*n,2*n) )
     """ return a Dictionary with the observables calculated by the system
     """
     ### Need to be checkced if it is better to preallocate the variables or define 
@@ -35,6 +40,8 @@ function Observables(vector,params=params,just_rho = false)
         sden_xab = zeros(ComplexF64, 3,2*n,2*n) ;
         @tullio Pi_abα[a,b,β] = psi_aikα[a,i,k,β]*conj(csi_aikα[b,i,k,β] )/hbar
     end
+    #println("join to observables___ inifite loop?")
+    #rho_ozaki = rho_denis(green,0.0, 1.0, vm_a1x, Temp, 1.0 )
     return_params = Dict( )  
     if params["curr"] == true                                          ### Current
         ##### Current
@@ -59,6 +66,44 @@ function Observables(vector,params=params,just_rho = false)
         vsden_xa1 = [sden_xa1[:, i] for i in 1:n :: Int]
         return_params["sden"] = vsden_xa1
     end
+    # if params["cden"]
+    #     ### Here the charge charge density that remain out of equilibrium is calculated 
+    #     cden = zeros(Float64, n )
+    #     for i in range(1, n)
+    #         cden[i] = tr(rho_ab[2*i-1:2*i, 2*i-1:2*i]  - rho_ozaki[2*i-1:2*i, 2*i-1:2*i] )
+    #     end
+    #     return_params["cden"] = real(cden)
+        
+    # end
+    
+    
+
+    # if params["bcurr"]
+    #     ### Here the bonds currents are calculated
+    #     #@tullio bcurr[a1] =-2*pi*im*rho_ab[a1,2a1] 
+    #     #vm_a1x,energy_llg; t = 1.0, Temp = Temp energy==0.0, t==1.0, [[jsd=1.0 it is never used ! ]] 
+    #     # This is related with the density matrix in equilibrium 
+    #     cc = zeros(Float64, n-1)
+    #     cx = zeros(Float64, n-1)
+    #     cy = zeros(Float64, n-1)
+    #     cz = zeros(Float64, n-1)
+    #     for i in range(1,n-1)
+    #         ### I need to add rho_ozaki but first lets see if it works 
+    #         rho_u = rho_ab[2*i-1:2*i, 2*i+1:2*i+2]  - rho_ozaki[2*i-1:2*i, 2*i+1:2*i+2]
+    #         ham_u = H_ab[2*i+1:2*i+2, 2*i-1:2*i] 
+    #         rho_d = rho_ab[2*i+1:2*i+2, 2*i-1:2*i] - rho_ozaki[2*i+1:2*i+2, 2*i-1:2*i]
+    #         ham_d = H_ab[2*i-1:2*i, 2*i+1:2*i+2]
+    #         cc_m = -2*pi*im*(rho_u*ham_u - rho_d*ham_d )
+    #         cc[i] = tr(cc_m) 
+    #         cx[i] = tr(σ_x*cc_m) 
+    #         cy[i] = tr(σ_y*cc_m) 
+    #         cz[i] = tr(σ_z*cc_m) 
+    #     end
+    #     return_params["bcurr"] = real([cc, cx, cy, cz ])
+            
+    # end
+
+    
     return return_params
 end
 

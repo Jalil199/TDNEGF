@@ -89,7 +89,7 @@ const name_preload_rkvec = get(loaded_parameters,"name_preload_rkvec", "rkvec_te
 const E_F_left = E_F_system + 0.5 * V_bias
 const E_F_right = E_F_system - 0.5 * V_bias
 const save_data = Dict("curr" => curr, "scurr" => scurr, "sden_eq" => sden_eq, "sden_neq" => sden_neq,
-                        "rho" => rho, "sclas" => sclas)
+                        "rho" => rho, "sclas" => sclas, "cden"=>true ,"bcurr" =>true)
 const save_data_qsl = Dict("curr" => curr, "scurr" => scurr, "sden_eq" => sden_eq, "sden_neq" => sden_neq,
                      "rho" => rho, "sclas" => sclas, "ent" => ent, "sden_qsl" => sden_qsl)
 data_fit_pdbest = readdlm( "./selfenergy/selfenergy_1DTB_NNLS_31_pbest.csv" , ',', Float64)
@@ -199,10 +199,14 @@ const size_rho = prod(dims_rho)
 J_sd_local = J_sd.*ones(n) 
 thop_local = thop.*ones(n-1) 
 tso_local = alpha_r.*ones(n-1) 
+######################
+thop_local[1] = 0.1
+thop_local[end] = 0.1
+
 const size_rkvec = size_Omega1+size_Omega2+size_Omega3+size_psi+size_rho 
 #vec(Omega_αik1βjp1),vec(Omega_αik1βjp2),vec(Omega_αik2βjp1), vec(psi_aikα), vec(rho_ab)
 #rkvec = zeros(ComplexF64, size_rkvec)#to_vector(dOmega_αβipjk, dpsi_aikα, drho_ab )
-const params_0 = Dict("curr"=>curr, "scurr"=>scurr, "sden"=>sden, "rho"=>rho);    ### Observables calculated at each time step
+const params_0 = Dict("curr"=>curr, "scurr"=>scurr, "sden"=>sden, "rho"=>rho,"cden"=>true ,"bcurr" =>true);    ### Observables calculated at each time step
 # sden_xa1 = zeros(Float64, 3, n);                                              ### spin density
 # curr_α = zeros(ComplexF64,2)
 # scurr_xα = zeros(ComplexF64, 3,2)

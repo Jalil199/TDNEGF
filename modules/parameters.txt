@@ -6,7 +6,7 @@ delta_tdep_L = 0
 delta_tdep_R = 0
 E_F_system = 0.0
 V_bias = 0.0                       # Fermi energy and Vbias
-alpha_r = 0.0                      # Rashba parameter
+alpha_r = 0.1                      # Rashba parameter
 theta_1 = 45.
 phi_1 =  0.0                       # Angles of sub lattice 1
 theta_2 = 12.9
@@ -19,7 +19,7 @@ Temp = 300.
 N_poles =  30                      # Temp, Npoles of the fermi function
 t_0 = 0.0
 t_step = 0.1
-t_end = 1400 #400 #200#5000 #400                       # time to start step and end
+t_end = 5400 #400 #200#5000 #400                       # time to start step and end
 # light flag
 J_sd = 0.2                         # jsd_to_llg from classical spin to H_el
 n_precessing = 0                   # number of spins precessing
@@ -84,7 +84,7 @@ name_preload_rkvec = rkvec_eq_state_soc_jl.txt # rkvec_test_jl.txt
 # spin_current_sfile
 # bond_currents_file
 # rho_file
-name = around_x #eq_state_nosoc#test ##NiPt5_nosoc #Ni2 #test #curr_gene2_soc #qsl_test_2_fe #pumping_check_norm_nosoc #qsl_test_fe   # names
+name = NiPt_soc_ndis#test #around_x #eq_state_nosoc#test ##NiPt5_nosoc #Ni2 #test #curr_gene2_soc #qsl_test_2_fe #pumping_check_norm_nosoc #qsl_test_fe   # names
 read_bias_file = false
 bias_file = vtd.txt
 

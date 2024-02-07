@@ -23,10 +23,14 @@ include("./modules/configuration.jl")
 include("./modules/create_hamiltonian.jl")
 include("./modules/dynamical_variables.jl")
 include("./modules/equation_of_motion.jl")
+println(11)
 include("./modules/equilibrium_variables.jl")
+println(22)
 include("./modules/green_functions.jl")
 include("./modules/llg.jl")
+println(33)
 include("./modules/observables.jl")
+println(44)
 include("./modules/osaki_poles.jl")
 include("./modules/precession.jl")
 println("Modules were  loaded")
@@ -40,13 +44,18 @@ import .configuration: configure!
 import .create_hamiltonian: create_H
 import .llg: llg_parameters, heff, heun
 import .precession: PrecSpin, update!
+import .green_functions: green
 import .observables: Observables
-import .equilibrium_variables: init_denis, spindensity_eq
-import .equation_of_motion: eom!
+import .equilibrium_variables: init_denis, spindensity_eq, rho_denis
+import .equation_of_motion: eom!, to_matrix
 println("Parameters were loaded")
     
-    # data =readdlm("./M_NiPt.out")
-    
+    data =readdlm("./M_NiPt.out")
+    data = data/maximum(data[:,1])
+
+    # data =readdlm("./MNi.out") ### this only work for MNi 
+    # data = data/maximum(data[:,2])
+    #println(data)
 function main()
     ### Initiallize the variables in the dynamics
     rkvec = zeros(ComplexF64, size_rkvec)
@@ -61,7 +70,9 @@ function main()
     H_ab = create_H(vm_a1x)                                             ### Initiallize the hamiltonian
     ### Initial evaluation of spin density 
     #println("parameterrrrs",params)
+    println(0)
     sm_neq_a1x = Observables(rkvec,params_0 )["sden"]                  ### Modify the global parameter rkvec
+    println(1)
     ### Parameters of the system in equilibirum 
     poles_denis, res_denis = init_denis(mu = E_F_system,temp=Temp,e_min=-3.,p=21)
     ### Read bias file
@@ -84,6 +95,9 @@ function main()
     save_data["sden_neq"] && (sneq_f = open("./data/sneq_$(name)_jl.txt", "w+") )
     save_data["rho"] && (rkvec_f = open("./data/rkvec_$(name)_jl.txt", "w+") )
     save_data["sclas"] && (cspins_f = open("./data/cspins_$(name)_jl.txt", "w+") )
+
+    save_data["cden"] &&  (cden_f = open("./data/cden_$(name)_jl.txt", "w+")  )
+    save_data["bcurr"] && (bcurr_f = open("./data/bcurr_$(name)_jl.txt", "w+")  )
     ## Vern7 RK7/8
     integrator =  init(prob,Vern7(),dt=t_step, save_everystep=false,adaptive=true,dense=false)
     #,reltol=1e-12,abstol=1e-12)#,dt=t_step,reltol=1e-6,abstol=1e-6 )
@@ -106,26 +120,58 @@ function main()
         configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins,tt) 
             ### added to see the evl
             
-            # if tt <= 1000#5075
-            #     vm_a1x = [[1.,0.,0.] for _ in 1:n]
+            # if tt <= 5000#5075
+            #     vm_a1x = [[0.,0.,1.] for _ in 1:n]
             # else
             #     try
-            #         vm_a1x = [[data[1+j*42,1],0.,0.] for _ in 1:n]   #### component 2 for Ni 
+            #         vm_a1x = [[0.,0.,data[1+j*42,1]] for _ in 1:n]   #### component 2 for Ni 
             #         j=j+1
             #     catch
             #         j=j-1
-            #         vm_a1x = [[data[1+j*42,1],0.,0.] for _ in 1:n]
+            #         vm_a1x = [[0.,0.,data[1+j*42,1]] for _ in 1:n]
                     
             #     end
             # end
             
         ### Calculate the needed observables at each time step 
-        obs = Observables(integrator.u , params_0, false )
+        obs = Observables(integrator.u , params_0, false)#;vm_a1x =vm_a1x   , H_ab = H_ab ) ### Note the two addisional arguments used to calculate the observables
+        ### Here the charge charge density that remain out of equilibrium is calculated 
+        Omega_αik1βjp1,Omega_αik1βjp2,Omega_αik2βjp1, psi_aikα, rho_ab = to_matrix(integrator.u)
+        rho_ozaki = rho_denis(green,0.0, 1.0, vm_a1x, Temp, 1.0 )
+        cden = zeros(Float64, n )
+        for i in range(1, n)
+            cden[i] = real(tr(rho_ab[2*i-1:2*i, 2*i-1:2*i]  - rho_ozaki[2*i-1:2*i, 2*i-1:2*i] ))
+        end
+        cden = real(cden)
+        ### Here the bonds currents are calculated
+        cc = zeros(Float64, n-1)
+        cx = zeros(Float64, n-1)
+        cy = zeros(Float64, n-1)
+        cz = zeros(Float64, n-1)
+        for i in range(1,n-1)
+            ### I need to add rho_ozaki but first lets see if it works 
+            rho_u = rho_ab[2*i-1:2*i, 2*i+1:2*i+2]  - rho_ozaki[2*i-1:2*i, 2*i+1:2*i+2]
+            ham_u = H_ab[2*i+1:2*i+2, 2*i-1:2*i] 
+            rho_d = rho_ab[2*i+1:2*i+2, 2*i-1:2*i] - rho_ozaki[2*i+1:2*i+2, 2*i-1:2*i]
+            ham_d = H_ab[2*i-1:2*i, 2*i+1:2*i+2]
+            cc_m = -2*pi*im*(rho_u*ham_u - rho_d*ham_d )
+            cc[i] = real(tr(cc_m) )
+            cx[i] = real(tr(σ_x*cc_m) ) 
+            cy[i] = real(tr(σ_y*cc_m) ) 
+            cz[i] = real(tr(σ_z*cc_m) ) 
+        end
+            
+        bcurrs = real([cc, cx, cy, cz ])
+            
+    
         save_data["curr"] && writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
         save_data["scurr"] && writedlm(sc_f, transpose(vcat(t,obs["scurr"]...) ), ' ' )
         save_data["sden_eq"] && writedlm(seq_f, transpose(vcat(t,sm_eq_a1x...) ), ' ' )
         save_data["sden_neq"] && writedlm(sneq_f, transpose(vcat(t,obs["sden"]...) ), ' ' )
         save_data["sclas"] && writedlm(cspins_f, transpose(vcat(t,vm_a1x...) ), ' ' )
+
+        save_data["cden"] && writedlm(cden_f, transpose(vcat(t,cden...) ), ' ' )
+        save_data["bcurr"] && writedlm(bcurr_f, transpose(vcat(t,bcurrs...) ), ' ' )
         ### This way to modify the parameter can be improved !!!
         if read_bias_file# & (i <= ti_bias)
             ### Notice that here we are sending a fully polarized pump in the positive direction
@@ -145,6 +191,9 @@ function main()
     save_data["sden_eq"] && close(seq_f)
     save_data["sden_neq"] && close(sneq_f)
     save_data["sclas"] && close(cspins_f )
+    save_data["cden"] && close(cden_f)
+    save_data["bcurr"] && close(bcurr_f)
+    
     if save_data["rho"]
         #### save the last step of the rkvec 
         writedlm(rkvec_f, integrator.u, ',' )
@@ -232,7 +281,7 @@ function main_qsl()#(;t_0=t_0, t_step=t_step, t_end=t_end, llg_params = llg_para
         run_llg && (vm_a1x .= heun(vm_a1x, diff,t_step,llg_parameters) )       ### magnetization at time t+dt
         ### at each time step 
         configure!(cspin_orientation,llg_parameters,vm_a1x,pr_spins,tt) 
-        obs = Observables(integrator.u , params_0, false )
+        obs = Observables(integrator.u , params_0, false;vm_a1x =vm_a1x   , H_ab = H_ab ) ### Note the two addisional arguments used to calculate the observables
         save_data_qsl["curr"] && writedlm(cc_f, transpose(vcat(t,obs["curr"]...) ), ' ' )
         save_data_qsl["scurr"] && writedlm(sc_f, transpose(vcat(t,obs["scurr"]...) ), ' ' )
         save_data_qsl["sden_eq"] && writedlm(seq_f, transpose(vcat(t,sm_eq_a1x...) ), ' ' )

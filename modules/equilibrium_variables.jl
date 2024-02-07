@@ -25,7 +25,7 @@ function spindensity_eq(vm_a1x, energy; t,Temp,jsd=1.0, solver = solver)
     rho = rho_denis(green,energy, t, vm_a1x, Temp,jsd)
     end
     params_sden = Dict( "sden" => true, "scurr"=>false
-                    , "curr"=>false, "rho"=>false )
+                    , "curr"=>false, "rho"=>false,"cden"=>false ,"bcurr" =>false )
     spin_eq = Observables(rho, params_sden, true)["sden"]
     return  spin_eq
 end
