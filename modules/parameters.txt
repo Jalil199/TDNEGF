@@ -6,7 +6,7 @@ delta_tdep_L = 0
 delta_tdep_R = 0
 E_F_system = 0.0
 V_bias = 0.0                       # Fermi energy and Vbias
-alpha_r = 0.1                      # Rashba parameter
+alpha_r = 0.0                      # Rashba parameter
 theta_1 = 45.
 phi_1 =  0.0                       # Angles of sub lattice 1
 theta_2 = 12.9
@@ -19,12 +19,12 @@ Temp = 300.
 N_poles =  30                      # Temp, Npoles of the fermi function
 t_0 = 0.0
 t_step = 0.1
-t_end = 5400 #400 #200#5000 #400                       # time to start step and end
+t_end = 5000 #5400 #400 #200#5000 #400                       # time to start step and end
 # light flag
 J_sd = 0.2                         # jsd_to_llg from classical spin to H_el
 n_precessing = 0                   # number of spins precessing
 solver = "denis"
-cspin_orientation = "arb_dir" #"precess_release" # "arb_dir"  #"sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
+cspin_orientation =  "light_pulse" #"arb_dir" #"precess_release" # "arb_dir"  #"sym_pump"  # "polarizer"#"precess"#"sym_pump"#"polarizer"#"arb_dir"
 # domain wall width
 # t_long time before start llg
 # t_bias time before start vbias
@@ -38,7 +38,7 @@ n_sites = 10                       # number of LLG sites (equal to -1)
 nt = 1                            # number of time steps in llg
 dt = 0.1                          # time interval of a single LLG step
 h0 = 0.0, 0.0, 0.0              # external magnetic field vector
-j_exc = 0.0                       # jexc coupling between classical spins
+j_exc = 0.2                       # jexc coupling between classical spins
 g_lambda = 0.0                    # gilbert damping factor
 j_sd = 0.2                        # jsd in the llg equation
 j_dmi = 0.0                       # Dyaloshinski-Moriya
@@ -51,7 +51,7 @@ js_ana = 0.0                      # Jsd_coupling of the analyzer
 thop = 1.0                        # Hopping in the central part
 p_theta = 0.0                     # polarizer vector theta
 p_phi = 0.0                       # polarizer vector phi
-run_llg = false
+run_llg = true
 ################################### Save and replay
 #save_curr = true
 #save_scurr = true                 # save currents
@@ -62,6 +62,8 @@ sden_neq = true
 rho = true
 sden = true                       # save densities
 sclas = true
+cden = true
+bcurrs =true
 ent = true
 sden_qsl = true
 # replay_llg
@@ -84,7 +86,7 @@ name_preload_rkvec = rkvec_eq_state_soc_jl.txt # rkvec_test_jl.txt
 # spin_current_sfile
 # bond_currents_file
 # rho_file
-name = NiPt_soc_ndis#test #around_x #eq_state_nosoc#test ##NiPt5_nosoc #Ni2 #test #curr_gene2_soc #qsl_test_2_fe #pumping_check_norm_nosoc #qsl_test_fe   # names
+name = test # NiPt_soc_ndis#test #around_x #eq_state_nosoc#test ##NiPt5_nosoc #Ni2 #test #curr_gene2_soc #qsl_test_2_fe
 read_bias_file = false
 bias_file = vtd.txt
 

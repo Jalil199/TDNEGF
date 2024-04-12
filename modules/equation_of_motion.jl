@@ -4,25 +4,26 @@ using LinearAlgebra          ### Linear algebra library
 using Tullio                 ### Library to work with tensors
 #include("parameters.jl")
 #using .parameters
-include("get_parameters.jl")
-using .get_parameters
-include("derived_constants.jl")
-using .derived_constants
+# include("get_parameters.jl")
+# using .get_parameters
+# include("derived_constants.jl")
+# using .derived_constants
 
-function to_matrix(vector)
+function to_matrix(vector,p)
     """ This function transform a vector into a tensor 
     """
-    @views Omega_αik1βjp1 = reshape(vector[1:size_Omega1], dims_Omega1 )
+    ##### With the macro views it joins to the link vector and it modify (It is not necesary to define it !?)
+    Omega_αik1βjp1 = reshape(vector[1:p.size_Omega1], p.dims_Omega1 )
     #Omega_αik1βjp1 = reshape( Omega_αik1βjp1, dims_Omega1 )
-    @views Omega_αik1βjp2 = reshape(vector[size_Omega1+1:size_Omega1+ size_Omega2],dims_Omega2)
+    Omega_αik1βjp2 = reshape(vector[p.size_Omega1+1:p.size_Omega1+ p.size_Omega2],p.dims_Omega2)
     #Omega_αik1βjp2 = reshape( Omega_αik1βjp2, dims_Omega2 )
-    @views Omega_αik2βjp1 = reshape(vector[size_Omega1+size_Omega2+1 : size_Omega1+size_Omega2+size_Omega3],dims_Omega3)
+    Omega_αik2βjp1 = reshape(vector[p.size_Omega1+p.size_Omega2+1 : p.size_Omega1+p.size_Omega2+p.size_Omega3],p.dims_Omega3)
     #Omega_αik2βjp1 = reshape( Omega_αik2βjp1, dims_Omega3 )
-    @views psi_aikα = reshape(vector[size_Omega1+ size_Omega2+size_Omega3+1 : size_Omega1+ size_Omega2+size_Omega3+ size_psi ],
-                        dims_psi)
+    psi_aikα = reshape(vector[p.size_Omega1+ p.size_Omega2+p.size_Omega3+1 : p.size_Omega1+ p.size_Omega2+p.size_Omega3+ p.size_psi ],
+                        p.dims_psi)
     #psi_aikα = reshape(psi_aikα, dims_psi )
-    @views rho_ab = reshape(vector[size_Omega1+ size_Omega2+size_Omega3+ size_psi+ 1 : size_Omega1+ 
-            size_Omega2+size_Omega3+ size_psi+ size_rho ], dims_rho)
+    rho_ab = reshape(vector[p.size_Omega1+ p.size_Omega2+p.size_Omega3+ p.size_psi+ 1 : p.size_Omega1+ 
+            p.size_Omega2+p.size_Omega3+ p.size_psi+ p.size_rho ], p.dims_rho)
 
     return  Omega_αik1βjp1,Omega_αik1βjp2,Omega_αik2βjp1, psi_aikα, rho_ab
 end
@@ -57,30 +58,39 @@ function eom!(du, u, p, t)
     in this case the variable du is modified 
     to deffine the differential equation
     """
-    
+    #dOmega_αikβjp = #zeros(ComplexF64,2,n_channels,k_poles,2 ,n_channels,k_poles)
+    dOmega_αik1βjp1 = Array{ComplexF64}(undef,p.dims_Omega1)#zeros(ComplexF64,2,n_channels,n_lorentz,2 ,n_channels,n_lorentz)
+    dOmega_αik1βjp2 = Array{ComplexF64}(undef,p.dims_Omega2)#zeros(ComplexF64,2,n_channels,n_lorentz,2 ,n_channels,N_poles)
+    dOmega_αik2βjp1= Array{ComplexF64}(undef,p.dims_Omega3)#zeros(ComplexF64,2,n_channels,N_poles,2 ,n_channels,n_lorentz)
+    summ1_aik1α = zeros(ComplexF64,2*p.n,2,p.n_lorentz,2)
+    summ2_aik1α = zeros(ComplexF64,2*p.n,2,p.n_lorentz,2)
+    summ3_aik2α = zeros(ComplexF64,2*p.n,2,p.N_poles,2)
+    dpsi_aikα = Array{ComplexF64}(undef,p.dims_psi)#zeros(ComplexF64, 2*n, n_channels, k_poles, 2 )
+    drho_ab = Array{ComplexF64}(undef,p.dims_rho)#zeros(ComplexF64, 2*n, 2*n )
      #### will be better Preallocate them? need to be checked
-#     dOmega_αikβjp = zeros(ComplexF64,2,n_channels,k_poles,2 ,n_channels,k_poles)
-#     dOmega_αik1βjp1 = zeros(ComplexF64,2,n_channels,n_lorentz,2 ,n_channels,n_lorentz)
-#     dOmega_αik1βjp2 = zeros(ComplexF64,2,n_channels,n_lorentz,2 ,n_channels,N_poles)
-#     dOmega_αik2βjp1= zeros(ComplexF64,2,n_channels,N_poles,2 ,n_channels,n_lorentz)
-#     summ1_aik1α = zeros(ComplexF64,2*n,2,n_lorentz,2)
-#     summ2_aik1α = zeros(ComplexF64,2*n,2,n_lorentz,2)
-#     summ3_aik2α = zeros(ComplexF64,2*n,2,N_poles,2)
-#     dpsi_aikα = zeros(ComplexF64, 2*n, n_channels, k_poles, 2 )
-#     drho_ab = zeros(ComplexF64, 2*n, 2*n )
-
-    H_ab::Array{ComplexF64} = p[1]
-    delta_αi::Matrix{Float64} = p[2]
+    H_ab::Array{ComplexF64} = p.H_ab#p[1]
+    delta_αi::Matrix{Float64} = p.delta_αi#p[2]
+    Pi_abα::Array{ComplexF64} = p.Pi_abα#zeros(ComplexF64, 2*n, 2*n, 2 )
+    hi_αmk::Array{ComplexF64} = p.hi_αmk
+    hi_αmk1::Array{ComplexF64} = p.hi_αmk1
+    hi_αmk2::Array{ComplexF64} = p.hi_αmk2
+    Gam_greater_αmik::Array{ComplexF64} = p.Gam_greater_αmik
+    Gam_lesser_αmik::Array{ComplexF64} = p.Gam_lesser_αmik
+    csi_aikα::Array{ComplexF64} = p.csi_aikα
+    hbar::Float64 = p.hbar  # (eV*fs)
+    n_lorentz::Int = p.n_lorentz
+    size_Omega1::Int = p.size_Omega1
+    size_Omega2::Int = p.size_Omega2
+    size_Omega3::Int = p.size_Omega3
+    size_psi::Int = p.size_psi
+    size_rho::Int = p.size_rho
+    p.Omega_αik1βjp1::Array{ComplexF64,6},p.Omega_αik1βjp2::Array{ComplexF64,6},p.Omega_αik2βjp1::Array{ComplexF64,6}, p.psi_aikα::Array{ComplexF64,4}, p.rho_ab::Array{ComplexF64,2} = to_matrix(u,p)
+    Omega_αik1βjp1=p.Omega_αik1βjp1
+    Omega_αik1βjp2=p.Omega_αik1βjp2
+    Omega_αik2βjp1=p.Omega_αik2βjp1
+    psi_aikα=p.psi_aikα
+    rho_ab=p.rho_ab
     
-    Pi_abα = zeros(ComplexF64, 2*n, 2*n, 2 )
-    ## Preallocation of the variables to be used 
-    Omega_αik1βjp1 = Array{ComplexF64}(undef,dims_Omega1)
-    Omega_αik1βjp2 = Array{ComplexF64}(undef,dims_Omega2)#zeros(ComplexF64,2,n_channels,n_lorentz,2 ,n_channels,N_poles)
-    Omega_αik2βjp1= Array{ComplexF64}(undef,dims_Omega3)#zeros(ComplexF64,2,n_channels,N_poles,2 ,n_channels,n_lorentz)
-    psi_aikα = Array{ComplexF64}(undef,dims_psi)#zeros(ComplexF64, 2*n, n_channels, k_poles, 2 )
-    rho_ab = Array{ComplexF64}(undef,dims_rho)
-
-    Omega_αik1βjp1,Omega_αik1βjp2,Omega_αik2βjp1, psi_aikα, rho_ab = to_matrix(u)
     ### Notice that i take out the conjugate
     @tullio threads=true   dOmega_αik1βjp1[α,i,k1+0,β,j,p1+0] = begin 
     (   conj( csi_aikα[a,j,p1,β])*psi_aikα[a,i,k1,α]*(Gam_greater_αmik[β,1,j,p1] 
