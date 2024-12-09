@@ -9,7 +9,6 @@ using Tullio
 function read_params(archivo_parametros::String)#;archivo_parametros=archivo_parametros)
     """ Stores the parameters of a txt file into a dictionary 
     """
-    
     parametros = Dict{String, Any}()
     open(archivo_parametros) do file
         for linea in eachline(file)

@@ -15,7 +15,6 @@ println("Developed by Marko Petrovic, and Bogdan S. Popescu")
 println("Modified and rewritten in julia by Jalil Varela-Manjarres")
 println("Number of threads used in operations is : " , Threads.nthreads()  )
 ### Internal modules
-
 include("./modules/configuration.jl")
 include("./modules/create_hamiltonian.jl")
 include("./modules/global_parameters.jl")
@@ -23,15 +22,7 @@ include("./modules/equation_of_motion.jl")
 include("./modules/equilibrium_variables.jl")
 include("./modules/llg.jl")
 include("./modules/observables.jl")
-
 println("Modules were  loaded")
-#push!(LOAD_PATH, "/home/jalil/Projects2023/TDNEGF/TDNEGF/modules/")
-#using .parameters
-###### import .read_parameters: read_params
-###read_params(;archivo_parametros= "./modules/$(ARGS[1]).txt")
-###using .get_parameters  #### Use all the internal parameters
-###using .derived_constants
-#using ..global_parameters: observables_var
 import .global_parameters: global_params, get_poles,create_hi, create_Gam, create_csi
 import .configuration: configure!
 import .create_hamiltonian: create_H
@@ -43,48 +34,26 @@ println("Parameters were loaded")
 function main()
     println("Join the Main function")
     ### Initiallize the variables in the dynamics
-    #global_var,config_var,llg_parameters,eq_var, dynamics_var, observables_var = global_params("./modules/$(ARGS[1]).txt")
-    #global_var,config_var,llg_parameters,eq_var,dynamics_var,eq_var,observables_var = global_var(), config_var(),llg_parameters(),eq_var(),dynamics_var(),observables_var()
     global_var ,dynamics_var ,observables_var, llg_parameters,config_var,eq_var = global_params("./modules/$(ARGS[1]).txt")
-    #global_ ,dynamics,observables, llg_params 
-    #println(global_var.n)
-    ##println("Global structures were created")
     Eig_vals, Res_p = get_poles(global_var.n_channels*global_var.N_poles)
     Eig_vals_k2α = cat(Eig_vals,Eig_vals,dims=2)
     R_k2α = cat(Res_p,Res_p,dims=2) 
-    ###(;eps_k1α = eps_k1α , w0_k1α = w0_k1α, E_F_α = E_F_α, Eig_vals_k2α = Eig_vals_k2α)
     dynamics_var.hi_αmk,dynamics_var.hi_αmk1,dynamics_var.hi_αmk2 = create_hi(global_var; Eig_vals_k2α = Eig_vals_k2α)
-    ##println("Create hi")
-    ###(;hi_αmk=hi_αmk,hi_αmk1=hi_αmk1,hi_αmk2=hi_αmk2,E_F_α = E_F_α, R_k2α= R_k2α,gam_k1iα=gam_k1iα,w0_k1α=w0_k1α,eps_k1α=eps_k1α)
 dynamics_var.Gam_greater_αmik,dynamics_var.Gam_lesser_αmik=create_Gam(global_var;R_k2α=R_k2α,hi_αmk=dynamics_var.hi_αmk,hi_αmk1=dynamics_var.hi_αmk1,hi_αmk2=dynamics_var.hi_αmk2 )
-    ##println("Create Gam")
     dynamics_var.csi_aikα = create_csi(global_var) ;
-    #println("Create csi")
-    #println("Dynamical variables were created")
     ### The initial configuraration is defined inside the function configure!()
     configure!(0.0 ,dynamics_var; global_var = global_var, config_var = config_var)
-    #println("Configure")
     dynamics_var.H_ab = create_H(dynamics_var.vm_a1x; global_var = global_var, config_var = config_var )     ## Initiallize the hamiltonian
-    #println("Hamiltonian")
-    ### Initial evaluation of spin density 
-    # dynamics_var.Omega_αik1βjp1,dynamics_var.Omega_αik1βjp2
-    # ,dynamics_var.Omega_αik2βjp1, dynamics_var.psi_aikα,
-    # dynamics_var.rho_ab = to_matrix(dynamics_var.rkvec,dynamics_var)
     ### Only modifies sm_neq_a1x This should be especified in paras_0
     params_sden = Dict("curr"=>false, "scurr"=>false, "sden"=>true, "cden" =>false, "bcurrs" =>false);  #### Only the spin density is obtained 
     #params   = Dict("curr"=>false, "scurr"=>false, "sden"=>true, "cden" =>true, "bcurrs" =>true);  #### Only the spin density is obtained 
     Observables!(dynamics_var.rkvec,params_sden,dynamics_var,observables_var,global_var ) ### Modifies the observables
-    ##println("Evaluation of the observables")
     ### Parameters of the system in equilibirum 
     init_denis!(eq_var) 
-    ##println("Load equilibrium parameters")
-    ### Read bias file
-        # global_var.read_bias_file ? dynamics_var.delta_αi[1,1],dynamics_var.delta_αi[1,1] = global_var.data_bias[1,1],global_var.data_bias[1,1] :  dynamics_var.delta_αi = zeros(Float64,2,2)
     global_var.preload_rkvec &&   (rkvec = readdlm("./data/rkvec_test_jl.txt",',', ComplexF64) )
     println("preload rkvec file : " , global_var.preload_rkvec, ", with name : ", global_var.name_preload_rkvec)
     ### Seting ODE for electrons-bath
     prob = ODEProblem(eom!,dynamics_var.rkvec, (0.0,global_var.t_end), dynamics_var) #[H_ab,delta_αi] )         ### defines the problem for the differentia equation 
-    ##println("Definition of ODE")
     ### Open the files were the data is saved
     global_var.save_data["curr"] && (cc_f = open("./data/cc_$(global_var.name)_jl.txt", "w+") )
     global_var.save_data["scurr"] && (sc_f = open("./data/sc_$(global_var.name)_jl.txt", "w+") )
@@ -94,13 +63,14 @@ dynamics_var.Gam_greater_αmik,dynamics_var.Gam_lesser_αmik=create_Gam(global_v
     global_var.save_data["sclas"] && (cspins_f = open("./data/cspins_$(global_var.name)_jl.txt", "w+") )
     global_var.save_data["cden"] &&  (cden_f = open("./data/cden_$(global_var.name)_jl.txt", "w+")  )
     global_var.save_data["bcurrs"] && (bcurr_f = open("./data/bcurr_$(global_var.name)_jl.txt", "w+")  )
-    ##println("Open files to save the data")
     ## Vern7 RK7/8
     integrator =  init(prob,Vern7(),dt = global_var.t_step, save_everystep=false,adaptive=true,dense=false)
-    pulse_light = readdlm("./pulse_test.txt")
-    ##println("Definition of integration ")
+    pulse_light = readdlm("./pulse_12_gap.txt")
     #,reltol=1e-12,abstol=1e-12)#,dt=t_step,reltol=1e-6,abstol=1e-6 )
     j=0
+    thops = config_var.thops
+    rho_avg_ab = zeros(ComplexF64, 2*global_var.n, 2*global_var.n )
+    U_ab = ones(ComplexF64, 2*global_var.n, 2*global_var.n )
     elapsed_time = @elapsed begin
     ## For loop for the evolution of a single step
     for (i,t) in enumerate(global_var.t_0:global_var.t_step:(global_var.t_end-global_var.t_step) )
@@ -109,37 +79,27 @@ dynamics_var.Gam_greater_αmik,dynamics_var.Gam_lesser_αmik=create_Gam(global_v
         flush(stdout)                                                ### asure that time_step is printed
         step!(integrator,global_var.t_step, true)                               ### evolve one time step  
         Observables!(integrator.u, params_sden,dynamics_var,observables_var,global_var) 
-        ########println("Calculation of the spin density out of eq")
-        #### Again the sm_neq_a1x is calculated
         ### The equilibirum spin density is calculated with the insatanteous hamiltonian. 
-        dynamics_var.sm_eq_a1x .= spindensity_eq(dynamics_var.H_ab,eq_var,global_var)#(H, global_var)#(vm_a1x,energy_llg; t = 1.0, Temp = Temp ) ### Caluclates the spin density in equilibrium
-        ########println("Calculation of the spin density in eq")
+        dynamics_var.sm_eq_a1x .= spindensity_eq(dynamics_var.H_ab,eq_var,global_var)
         dynamics_var.diff .= observables_var.vsden_xa1 .- dynamics_var.sm_eq_a1x
         ### Now the magnetization is computed at time t + dt
-        global_var.run_llg && (dynamics_var.vm_a1x .= heun(dynamics_var.vm_a1x, dynamics_var.diff,global_var.t_step,llg_parameters)     )   ### magnetization at time t+dt
-        ### Depending of the configuration, it modifies the configuration of the system
-        ### at each time step 
-        configure!(tt, dynamics_var; global_var = global_var, config_var = config_var  ) ### Note that the Rice-Mele configuration is used
-        if tt > 1000 
+        #### Here llg runs 
+        configure!(tt, dynamics_var; global_var = global_var, config_var = config_var  ) ### Note that the Rice-Mele configuration is used 
+        #global_var.run_llg && (dynamics_var.vm_a1x .= heun(dynamics_var.vm_a1x, dynamics_var.diff,global_var.t_step,llg_parameters))
+        if tt > 200#1000    
+            ### magnetization at time t+dt
             try
-                config_var.thops = config_var.thops*exp(im*0.5*pulse_light[j+1]) ### The parameters are modified again to include the time dependence 
-                #println(j )
+                config_var.thops = thops*exp(im*0.2*pulse_light[j+1]) ### The parameters are modified again to include the time dependence 
                 j=j+1
             catch 
-                #println("nothing")
+                config_var.thops = thops
                 nothing
             end
         end
-                    
-                
-        ########println("Evaluate the configuration at time t")
         ### Calculate the needed observables at each time step 
         Observables!(integrator.u, global_var.params, dynamics_var, observables_var, global_var) 
-        #######println("Calculation of the other observables")
         observables_var.cden = observables_var.cden - cden_eq(dynamics_var.H_ab, eq_var,global_var)
-        #####println("Calculation of cden ")
         observables_var.bcurrs = observables_var.bcurrs - bcurrs_eq(dynamics_var.H_ab, eq_var,global_var)
-        ######println("Calculation of bcurrs")
         ### Save the data at each time step
         global_var.save_data["curr"] && writedlm(cc_f, [t;observables_var.curr_α...]', ' ' )
         global_var.save_data["scurr"] && writedlm(sc_f, [t;observables_var.scurr_xα...]' , ' ' )
@@ -148,24 +108,30 @@ dynamics_var.Gam_greater_αmik,dynamics_var.Gam_lesser_αmik=create_Gam(global_v
         global_var.save_data["sclas"] && writedlm(cspins_f,[t;dynamics_var.vm_a1x...]', ' ' )
         global_var.save_data["cden"] && writedlm(cden_f, [t;observables_var.cden...]', ' ' )
         global_var.save_data["bcurrs"] && writedlm(bcurr_f, [t;observables_var.bcurrs...]', ' ' )
-
-     #    save_data["curr"] && writedlm(cc_f, transpose(vcat(t,real(obs["curr"])...) ), ' ' )
-    	# save_data["scurr"] && writedlm(sc_f, transpose(vcat(t,real(obs["scurr"])...) ), ' ' )
-    	# save_data["sden_eq"] && writedlm(seq_f, transpose(vcat(t,real(sm_eq_a1x)...) ), ' ' )
-    	# save_data["sden_neq"] && writedlm(sneq_f, transpose(vcat(t,real(obs["sden"])...) ), ' ' )
-     #    save_data["sclas"] && writedlm(cspins_f, transpose(vcat(t,vm_a1x...) ), ' ' )
-     #    save_data["cden"] && writedlm(cden_f, transpose(vcat(t,cden...) ), ' ' )
-     #    save_data["bcurrs"] && writedlm(bcurr_f, transpose(vcat(t,bcurrs...) ), ' ' )
-        #####println("save data")
-        ### This way to modify the parameter can be improved !!!
-
+        #### Lets add the interaction term 
+        #cden_f
+        rho_i(i) = dynamics_var.rho_ab[2*i-1:2*i, 2*i-1:2*i]
+        U=0.5
+        function rho_avg(i) 
+            if (i>1) & (i<global_var.n)
+                rho_i(i+1) + rho_i(i-1) + rho_i(i)
+            elseif i==1
+                rho_i(i+1) +rho_i(i)
+            elseif i == global_var.n
+                rho_i(i-1)+rho_i(i)
+            end
+        end
+            
+        for i in range(1,global_var.n)
+            rho_avg_ab[2*i-1:2*i, 2*i-1:2*i] = rho_avg(i)
+        end
+        U_ab = U*rho_avg_ab.*U_ab
+        
         #### The variables parameters are updated depending on the configurarion 
-        # global_var.read_bias_file ? dynamics_var.delta_αi[1,1],dynamics_var.delta_αi[1,1] = global_var.data_bias[i+1,1],global_var.data_bias[i+1,1] :  dynamics_var.delta_αi = zeros(Float64,2,2)
-        dynamics_var.H_ab .= create_H(dynamics_var.vm_a1x; global_var = global_var, config_var = config_var )     ## update the hamiltonian                                                                                             ## time dependence inside h
-        #println("Update hamiltonian")
+        dynamics_var.H_ab .= create_H(dynamics_var.vm_a1x; global_var = global_var, config_var = config_var ) + U_ab    ## update the hamiltonian                  
+        # Update hamiltonian
         integrator.p.H_ab = dynamics_var.H_ab
         integrator.p.delta_αi
-        #println("Update parameters of the integrator")
     end ### This end is for the "for-loop"
     end ### This end is for the elapsed time
     ### The storage of this files must be checked 
@@ -181,7 +147,6 @@ dynamics_var.Gam_greater_αmik,dynamics_var.Gam_lesser_αmik=create_Gam(global_v
         writedlm(rkvec_f, integrator.u, ',' )
         close(rkvec_f)
     end
-    
     println("Total time of simulation: ", elapsed_time, " s" )
     nothing
 end
