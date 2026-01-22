@@ -76,7 +76,7 @@ end
 
 #### Save results
 using JLD2
-@save "./two_terminal_square_lattice_observables.jl2" obs
+@save "./examples/data/two_terminal_square_lattice_observables.jl2" obs
 println("The results has been saved")
 #### Plot results 
 # using PyPlot 
