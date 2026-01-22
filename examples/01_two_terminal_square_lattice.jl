@@ -1,4 +1,20 @@
 #!/usr/bin/env julia
+
+#=
+Example: 2D square lattice device coupled to square-lattice leads
+
+This example demonstrates how to use TDNEGF.jl to:
+  * Build a square-lattice Hamiltonian H_ab for a finite Nx × Ny system.
+  * Construct 2D square-lattice embedding self-energies using a pole expansion
+    (MiniPole residues for a semicircular DOS + Pade poles for the Fermi function).
+  * Set up channel vectors ξ_anα for left/right 2D leads and assemble Σ^</>(t).
+  * Integrate the TD-NEGF embedding EOM eom!(du,u,p,t) to obtain ρ_ab(t).
+  * Compute simple observables: local charge density n_i(t), bond currents, etc.
+
+    This script is intended as a pedagogical example and a template for users to
+    build their own setups, rather than a production-grade simulation input
+
+=#
 using Pkg
 Pkg.activate(joinpath(dirname((@__DIR__))))
 
