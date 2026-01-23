@@ -27,7 +27,7 @@ println("Number of threads with JUlIA_NUM used in operations is : " , Threads.nt
 println("Number of threads with BLAS used in operations is : " , BLAS.get_num_threads() )
 
 #### Define model and initial parameters
-function init_params(;Nx::Int=6, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
+function init_params(;Nx::Int=50, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
                      γ::Float64=1.0, γso=0.5 + 0.0im,Nα = 2, 
                      N_λ1::Int=49, N_λ2::Int=20, β::Float64=33.0)
     ### Get the poles 

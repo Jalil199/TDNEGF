@@ -9,6 +9,7 @@ DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Sunny = "2b4a2ac8-8f8b-43e8-abf4-3cb0c45e8736"
 Tullio = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
 
 [compat]
@@ -17,4 +18,5 @@ DifferentialEquations = "7.17.0"
 JLD2 = "0.6.3"
 LinearAlgebra = "1.11.0"
 StaticArrays = "1.9.16"
+Sunny = "0.8.1"
 Tullio = "0.3.8"
