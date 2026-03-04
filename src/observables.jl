@@ -106,7 +106,7 @@ end
     ### This function updates the spin density from an arbitraty density matrix 
     it = obs.idx
     #ρ  = dv.ρ_ab
-    #σx, σy, σz = p.σ_x, p.σ_y, p.σ_z
+    σx, σy, σz = p.σ_x, p.σ_y, p.σ_z
     site_ranges = [get_sub(i, p.N_loc) for i in 1:p.N_sites] 
     
     @inbounds for i in 1:p.N_sites

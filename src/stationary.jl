@@ -118,10 +118,11 @@ end
 
 ### Build the density matrix in Eq. for the instantaneus Hamiltonian
 function ρ_eq(ϵ_f::Float64, β::Float64, H::Matrix{ComplexF64},
-               Np::Int ,Ny::Int , Nσ::Int ,N_orb::Int ; Rtail::Float64=1e12, η = 1e-3)
+               Np::Int, Nx::Int ,Ny::Int , Nσ::Int ,N_orb::Int ; Rtail::Float64=1e12, η = 1e-3)
     
     z_p, R_p = pade_poles(Np)   # z_p = -im*ξ, R_p = -η
     dim = Nx * Ny * Nσ
+    one = Matrix{ComplexF64}(I, dim,dim  )
     
     ### Calculation of the GF based on the instantaneous Hamiltonian of the central system 
     

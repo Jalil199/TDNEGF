@@ -10,16 +10,18 @@ end
 
 ### Structure containig the main observables calculated by TDNEGF code 
 Base.@kwdef mutable struct ObservablesTDNEGF{T<:AbstractFloat}
-    t::Vector{T}        = Vector{T}(undef, 0)         # (N_tmax,)
-    n_i::Matrix{T}      = Matrix{T}(undef, 0, 0)      # (N_sites, N_tmax)
-    σx_i::Array{T,3}    = Array{T,3}(undef, 0, 0, 0)  # (N_sites, 3, N_tmax)  (x,y,z)
-    sx_i::Array{T,3}    = Array{T,3}(undef, 0, 0, 0)  # (N_sites, 3, N_tmax)  (x,y,z)
+    t::Vector{T}        = Vector{T}(undef, 0)           # (N_tmax,)
+    n_i::Matrix{T}      = Matrix{T}(undef, 0, 0)        # (N_sites, N_tmax)
+    σx_i::Array{T,3}    = Array{T,3}(undef, 0, 0, 0)    # (N_sites, 3, N_tmax)  (x,y,z)
+    ### Equilibrium spin density
+    σx_i_eq::Array{T,3}    = Array{T,3}(undef, 0, 0, 0) # (N_sites, 3, N_tmax)  (x,y,z) 
+    sx_i::Array{T,3}    = Array{T,3}(undef, 0, 0, 0)    # (N_sites, 3, N_tmax)  (x,y,z)
 
-    Iα::Matrix{T}       = Matrix{T}(undef, 0, 0)      # (N_leads, N_tmax)     lead charge current
-    Iαx::Array{T,3}     = Array{T,3}(undef, 0, 0, 0)  # (N_leads, 3, N_tmax)  lead spin current (x,y,z)
+    Iα::Matrix{T}       = Matrix{T}(undef, 0, 0)        # (N_leads, N_tmax)     lead charge current
+    Iαx::Array{T,3}     = Array{T,3}(undef, 0, 0, 0)    # (N_leads, 3, N_tmax)  lead spin current (x,y,z)
 
-    idx::Int            = 0                           # index associates with the iteration (it allow us to
-                                                      # run over the time slices of the observables)
+    idx::Int            = 0                             # index associates with the iteration (it allow us to
+                                                        # run over the time slices of the observables)
 end
 
 #### This function Initiallizes the observables 
@@ -28,6 +30,7 @@ function ObservablesTDNEGF(p::ModelParamsTDNEGF; N_tmax::Int, N_leads::Int, T::T
         t      = Vector{T}(undef, N_tmax),
         n_i    = Matrix{T}(undef, p.N_sites, N_tmax),
         σx_i   = Array{T,3}(undef, p.N_sites, 3, N_tmax),
+        σx_i_eq   = Array{T,3}(undef, p.N_sites, 3, N_tmax),
         sx_i   = Array{T,3}(undef, p.N_sites, 3, N_tmax),
         Iα     = Matrix{T}(undef, N_leads, N_tmax),
         Iαx    = Array{T,3}(undef, N_leads, 3, N_tmax),
@@ -98,6 +101,32 @@ end
     end
     return nothing
 end
+
+@inline function obs_σ_i_eq!(ρ::Matrix{ComplexF64} , p::ModelParamsTDNEGF, obs::ObservablesTDNEGF)
+    ### This function updates the spin density from an arbitraty density matrix 
+    it = obs.idx
+    #ρ  = dv.ρ_ab
+    σx, σy, σz = p.σ_x, p.σ_y, p.σ_z
+    site_ranges = [get_sub(i, p.N_loc) for i in 1:p.N_sites] 
+    
+    @inbounds for i in 1:p.N_sites
+        r = site_ranges[i]
+        ρloc = @view ρ[r, r]
+
+        sx=0.0; sy=0.0; sz=0.0
+        @inbounds for a in 1:p.N_loc, b in 1:p.N_loc
+            ρba = ρloc[b,a]   # tr(σ ρ) = Σ_ab σ_ab ρ_ba
+            sx += real(σx[a,b] * ρba)
+            sy += real(σy[a,b] * ρba)
+            sz += real(σz[a,b] * ρba)
+        end
+        obs.σx_i_eq[i,1,it] = sx
+        obs.σx_i_eq[i,2,it] = sy
+        obs.σx_i_eq[i,3,it] = sz
+    end
+    return nothing
+end
+
 
 @inline function cal_Π_abα(dv::DynamicalVariables,p::ModelParamsTDNEGF)
 
