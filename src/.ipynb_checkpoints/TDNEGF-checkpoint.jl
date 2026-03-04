@@ -14,6 +14,7 @@ module TDNEGF
     include("eom_tdnegf.jl")
     include("observables.jl")
     include("poles.jl")
+    include("stationary.jl")
     
     ### main function to export from types.jl
     export ModelParamsTDNEGF, DynamicalVariables, pointer
@@ -28,9 +29,11 @@ module TDNEGF
     # functions from eom_tdnegf.jl"
     export eom_tdnegf!
     # functions from observables.jl"
-    export ObservablesTDNEGF, obs_s_i!, obs_σ_i!, obs_n_i!,obs_Ixα!, get_sub
+    export ObservablesTDNEGF, obs_s_i!, obs_σ_i!, obs_n_i!,obs_Ixα!, get_sub, obs_σ_i_eq!
     # functions from poles.jl"
     export load_poles_square
+    # functions from  stationary.jl
+    export ρ_eq
      
     
 end # end module TDNEGF
