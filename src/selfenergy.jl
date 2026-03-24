@@ -123,11 +123,22 @@ module SelfEnergySquare
         end
         return ξ_an
     end
+
+    function build_ξ_local_index(Ns::Int, local_index::Vector{Int}, U_local::Matrix{ComplexF64})
+        length(local_index) == size(U_local, 1) || throw(ArgumentError("length(local_index) must match size(U_local, 1)"))
+        all(1 .<= local_index .<= Ns) || throw(ArgumentError("local_index entries must be within 1:Ns"))
+
+        Nc::Int = size(U_local, 2)
+        ξ_an = zeros(ComplexF64, Ns, Nc)
+        ξ_an[local_index, :] .= U_local
+        return ξ_an
+    end
     
     
     export build_Σᴸ_nλ,
            build_Σᴳ_nλ,
            build_χ_nλ,
-           build_ξ_an
+           build_ξ_an,
+           build_ξ_local_index
            
 end #module SelEnergySquare

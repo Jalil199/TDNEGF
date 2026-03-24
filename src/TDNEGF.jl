@@ -23,9 +23,9 @@ module TDNEGF
     ### Submodule of self energy for square lattice
     # Bring functions to the name space of module 
     using .SelfEnergySquare: build_Σᴸ_nλ, build_Σᴳ_nλ,
-                             build_χ_nλ, build_ξ_an
+                             build_χ_nλ, build_ξ_an, build_ξ_local_index
     # Export functios of self energy without join the submodule
-    export build_Σᴸ_nλ, build_Σᴳ_nλ, build_χ_nλ,build_ξ_an
+    export build_Σᴸ_nλ, build_Σᴳ_nλ, build_χ_nλ,build_ξ_an, build_ξ_local_index
     # functions from hamiltonians.jl"
     export build_H_ab, update_H_e!
     # functions from eom_tdnegf.jl"
