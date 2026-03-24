@@ -1,5 +1,6 @@
 using Test
 using TDNEGF
+using LinearAlgebra
 
 @testset "Experimental block RHS smoke test" begin
     Ns = 2
