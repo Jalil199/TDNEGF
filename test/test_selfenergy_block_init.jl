@@ -47,8 +47,8 @@ end
 function init_block_path(common)
     p = ModelParamsTDNEGF(; Nx = 2, Ny = 1, Nσ = 2, N_orb = 1, Nα = 2, N_λ1 = 49, N_λ2 = 2)
 
-    left_block = SelfEnergyBlock(:left, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anL, 0.5 + 0.0im)
-    right_block = SelfEnergyBlock(:right, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anR, -0.5 + 0.0im)
+    left_block = SelfEnergyBlock(:left, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anL, 0.5 + 0.0im)
+    right_block = SelfEnergyBlock(:right, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anR, -0.5 + 0.0im)
 
     p.H_ab .= common.H_ab
     p.H0_ab .= common.H_ab
@@ -67,6 +67,18 @@ function init_block_path(common)
     p.Γ′_nλα .= conj.(p.Γ_nλα)
 
     return p
+end
+
+@testset "SelfEnergyBlock enforces λ-split consistency" begin
+    Nc = 2
+    Ns = 4
+    ΣL_nλ = zeros(ComplexF64, Nc, 3)
+    ΣG_nλ = zeros(ComplexF64, Nc, 3)
+    χ_nλ = zeros(ComplexF64, Nc, 3)
+    ξ_an = zeros(ComplexF64, Ns, Nc)
+
+    @test_throws ArgumentError SelfEnergyBlock(:bad, Nc, 2, 0, 3, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, 0.0 + 0.0im)
+    @test_throws ArgumentError SelfEnergyBlock(:bad, 2, 2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, 0.0 + 0.0im)
 end
 
 @testset "SelfEnergyBlock initialization matches manual path" begin

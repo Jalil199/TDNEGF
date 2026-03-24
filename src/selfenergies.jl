@@ -24,6 +24,9 @@ struct SelfEnergyBlock
         ξ_an::Matrix{ComplexF64},
         Δ::ComplexF64,
     )
+        N_λ1 ≥ 0 || throw(ArgumentError("N_λ1 must be non-negative"))
+        N_λ2 ≥ 0 || throw(ArgumentError("N_λ2 must be non-negative"))
+        N_λ == N_λ1 + N_λ2 || throw(ArgumentError("N_λ must equal N_λ1 + N_λ2"))
         size(ΣL_nλ) == (Nc, N_λ) || throw(ArgumentError("size(ΣL_nλ) must be (Nc, N_λ)"))
         size(ΣG_nλ) == (Nc, N_λ) || throw(ArgumentError("size(ΣG_nλ) must be (Nc, N_λ)"))
         size(χ_nλ) == (Nc, N_λ) || throw(ArgumentError("size(χ_nλ) must be (Nc, N_λ)"))
@@ -35,6 +38,8 @@ end
 
 function SelfEnergyBlock(
     name::Symbol,
+    N_λ1::Int,
+    N_λ2::Int,
     ΣL_nλ::Matrix{ComplexF64},
     ΣG_nλ::Matrix{ComplexF64},
     χ_nλ::Matrix{ComplexF64},
@@ -42,7 +47,5 @@ function SelfEnergyBlock(
     Δ::ComplexF64,
 )
     Nc, N_λ = size(ΣL_nλ)
-    N_λ1 = N_λ
-    N_λ2 = 0
     return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
 end
