@@ -42,25 +42,19 @@ function init_params(;Nx::Int=50, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
     χ_nλ    = build_χ_nλ(zλ, p.Ny, p.Nσ, p.N_orb, p.N_λ1, p.N_λ2; β=β, γ=1.0)
     ξ_anR   = build_ξ_an(p.Nx, p.Ny, p.Nσ, p.N_orb; xcol = p.Nx,y_coup = 1:p.Ny)
     ξ_anL   = build_ξ_an(p.Nx, p.Ny, p.Nσ, p.N_orb; xcol = 1,y_coup = 1:p.Ny)
+    left_block  = SelfEnergyBlock(:left,  Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL,  0.5 + 0.0im)
+    right_block = SelfEnergyBlock(:right, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR, -0.5 + 0.0im)
     #### Asigning initial values of the precalculated things
     p.H_ab             .= H_ab
     p.H0_ab            .= H_ab
-    p.Δ_α              .= [0.5,-0.5] 
-    #### Self energies
-    p.Σᴸ_nλα[:,:,1]    .= Σᴸ_nλ
-    p.Σᴸ_nλα[:,:,2]    .= Σᴸ_nλ
-    p.Σᴳ_nλα[:,:,1]    .= Σᴳ_nλ
-    p.Σᴳ_nλα[:,:,2]    .= Σᴳ_nλ
-    Γ_nλα = 1im*copy(p.Σᴳ_nλα - p.Σᴸ_nλα)
-    p.Γ_nλα    .= Γ_nλα
-    #1im*(p.Σᴳ_nλα - p.Σᴸ_nλα)
-    #### Exponent from poles in the residue theorem 
-    p.χ_nλα[:,:,1]     .= χ_nλ
-    p.χ_nλα[:,:,2]     .= χ_nλ
-    #### Channel vectors 
-    p.ξ_anα[:,:,1]     .= ξ_anL
-    p.ξ_anα[:,:,2]     .= ξ_anR;
-    ####
+    for (α, block) in enumerate((left_block, right_block))
+        p.Σᴸ_nλα[:,:,α] .= block.ΣL_nλ
+        p.Σᴳ_nλα[:,:,α] .= block.ΣG_nλ
+        p.χ_nλα[:,:,α]  .= block.χ_nλ
+        p.ξ_anα[:,:,α]  .= block.ξ_an
+        p.Δ_α[α]        = block.Δ
+    end
+    p.Γ_nλα   .= 1im .* (p.Σᴳ_nλα .- p.Σᴸ_nλα)
     p.χ′_nλα  .= conj.(p.χ_nλα)
     p.Σᴸ′_nλα .= conj.(p.Σᴸ_nλα)
     p.Γ′_nλα  .= conj.(p.Γ_nλα);
@@ -131,4 +125,3 @@ println("The results has been saved")
 # plt.tight_layout()
 # plt.show()
 # ###------------------------------------------------------
-
