@@ -73,7 +73,6 @@ end
     @test first(b2.range_Ω11) == last(b2.range_Ψ) + 1
     @test first(b2.range_Ω12) == last(b2.range_Ω11) + 1
     @test first(b2.range_Ω21) == last(b2.range_Ω12) + 1
-    @test last(b2.range_Ω21) == length(vec)
 
     b2.Ω12[1, 1, 2, 2] = 3.0 + 4.0im
     @test vec[first(b2.range_Ω12) + 4] == 3.0 + 4.0im

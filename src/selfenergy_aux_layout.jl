@@ -125,20 +125,17 @@ Return zero-copy views into a flattened vector with:
     layouts::AbstractVector{SelfEnergyAuxBlockLayout},
 )
     size_ρ_ab = prod(dims_ρ_ab)
-    size_aux = isempty(layouts) ? 0 : last(layouts[end].range_block)
-    required_size = size_ρ_ab + size_aux
-    length(vec) < required_size && throw(ArgumentError("vector length $(length(vec)) is smaller than required size $(required_size)"))
-
     range_ρ_ab = 1:size_ρ_ab
     ρ_ab = reshape(view(vec, range_ρ_ab), dims_ρ_ab)
 
     aux_offset = size_ρ_ab
     block_views = Vector{SelfEnergyAuxBlockPointers}(undef, length(layouts))
     for (i, layout) in enumerate(layouts)
-        range_Ψ = (first(layout.range_Ψ) + aux_offset):(last(layout.range_Ψ) + aux_offset)
-        range_Ω11 = (first(layout.range_Ω11) + aux_offset):(last(layout.range_Ω11) + aux_offset)
-        range_Ω12 = (first(layout.range_Ω12) + aux_offset):(last(layout.range_Ω12) + aux_offset)
-        range_Ω21 = (first(layout.range_Ω21) + aux_offset):(last(layout.range_Ω21) + aux_offset)
+        shift = aux_offset + layout.offset - 1
+        range_Ψ = (first(layout.range_Ψ) + shift):(last(layout.range_Ψ) + shift)
+        range_Ω11 = (first(layout.range_Ω11) + shift):(last(layout.range_Ω11) + shift)
+        range_Ω12 = (first(layout.range_Ω12) + shift):(last(layout.range_Ω12) + shift)
+        range_Ω21 = (first(layout.range_Ω21) + shift):(last(layout.range_Ω21) + shift)
 
         Ψ_anλ = reshape(view(vec, range_Ψ), (layout.Ns, layout.Nc, layout.N_λ))
         Ω11 = reshape(view(vec, range_Ω11), (layout.Nc, layout.N_λ1, layout.Nc, layout.N_λ1))
