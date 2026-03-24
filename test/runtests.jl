@@ -6,3 +6,4 @@ include("test_build_xi_local_index.jl")
 
 include("test_selfenergy_aux_layout.jl")
 include("test_eom_tdnegf_blocks.jl")
+include("test_baseline_validation.jl")
