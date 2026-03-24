@@ -76,5 +76,7 @@ end
     @test last(b2.range_Ω21) == length(vec)
 
     b2.Ω12[1, 1, 2, 2] = 3.0 + 4.0im
-    @test vec[first(b2.range_Ω12) + 4] == 3.0 + 4.0im
+    idx_local = LinearIndices(b2.Ω12)[1, 1, 2, 2]
+    idx_global = first(b2.range_Ω12) + idx_local - 1
+    @test vec[idx_global] == 3.0 + 4.0im
 end
