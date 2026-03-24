@@ -30,7 +30,7 @@ function build_equivalent_rhs_setup()
     ]
     p_rect.Δ_α[1] = 0.07 + 0.00im
 
-    p_rect.Γ_nλα .= p_rect.Σᴸ_nλα .+ p_rect.Σᴳ_nλα
+    p_rect.Γ_nλα .= 1im .* (p_rect.Σᴳ_nλα .- p_rect.Σᴸ_nλα)
     p_rect.χ′_nλα .= conj.(p_rect.χ_nλα)
     p_rect.Σᴸ′_nλα .= conj.(p_rect.Σᴸ_nλα)
     p_rect.Γ′_nλα .= conj.(p_rect.Γ_nλα)
@@ -93,6 +93,7 @@ end
     eom_tdnegf!(du_rect, u_rect, p_rect, 0.0)
     eom_tdnegf_blocks!(du_blocks, u_blocks, p_blocks, 0.0)
 
+    @test p_rect.Γ_nλα ≈ 1im .* (p_rect.Σᴳ_nλα .- p_rect.Σᴸ_nλα)
     @test du_rect ≈ du_blocks rtol = 1e-12 atol = 1e-12
 
     dt = 1e-4

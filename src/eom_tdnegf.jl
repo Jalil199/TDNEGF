@@ -439,7 +439,8 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
             for λ in 1:N_λ
                 χ′ = conj(block.χ_nλ[n, λ])
                 Σᴸ′ = conj(block.ΣL_nλ[n, λ])
-                Γ′ = conj(block.ΣL_nλ[n, λ] + block.ΣG_nλ[n, λ])
+                # Keep Γ convention aligned with legacy path: Γ = 1im * (Σᴳ - Σᴸ).
+                Γ′ = conj(1im * (block.ΣG_nλ[n, λ] - block.ΣL_nλ[n, λ]))
                 coef_χΨ = 1im * (χ′ + block.Δ)
                 coef_Σξ = 1im * Σᴸ′
                 coef_Γρξ = -Γ′
@@ -526,27 +527,27 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
                 for λ1 in 1:N_λ1
                     χ′_nλ1 = conj(block.χ_nλ[n, λ1])
-                    Γ′_nλ1 = conj(block.ΣL_nλ[n, λ1] + block.ΣG_nλ[n, λ1])
+                    Γ′_nλ1 = conj(1im * (block.ΣG_nλ[n, λ1] - block.ΣL_nλ[n, λ1]))
                     for λ1_p in 1:N_λ1
                         χ_npλ1p = block.χ_nλ[n_p, λ1_p]
-                        Γ_npλ1p = block.ΣL_nλ[n_p, λ1_p] + block.ΣG_nλ[n_p, λ1_p]
+                        Γ_npλ1p = 1im * (block.ΣG_nλ[n_p, λ1_p] - block.ΣL_nλ[n_p, λ1_p])
                         term1 = -1im * Γ_npλ1p * dot1[λ1]
                         term2 = -1im * Γ′_nλ1 * dot2[λ1_p]
-                        pref3 = -1im * (χ_npλ1p - χ′_nλ1)
+                        pref3 = -1im * (χ_npλ1p + block.Δ - χ′_nλ1 - block.Δ)
                         dbptr.Ω11[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * bptr.Ω11[n, λ1, n_p, λ1_p]
                     end
                 end
 
                 for λ1 in 1:N_λ1
                     χ′_nλ1 = conj(block.χ_nλ[n, λ1])
-                    Γ′_nλ1 = conj(block.ΣL_nλ[n, λ1] + block.ΣG_nλ[n, λ1])
+                    Γ′_nλ1 = conj(1im * (block.ΣG_nλ[n, λ1] - block.ΣL_nλ[n, λ1]))
                     for λ2_p in 1:N_λ2
                         λglob_2p = N_λ1 + λ2_p
                         χ_npλ2p = block.χ_nλ[n_p, λglob_2p]
-                        Γ_npλ2p = block.ΣL_nλ[n_p, λglob_2p] + block.ΣG_nλ[n_p, λglob_2p]
+                        Γ_npλ2p = 1im * (block.ΣG_nλ[n_p, λglob_2p] - block.ΣL_nλ[n_p, λglob_2p])
                         term1 = -1im * Γ_npλ2p * dot1[λ1]
                         term2 = -1im * Γ′_nλ1 * dot4[λ2_p]
-                        pref3 = -1im * (χ_npλ2p - χ′_nλ1)
+                        pref3 = -1im * (χ_npλ2p + block.Δ - χ′_nλ1 - block.Δ)
                         dbptr.Ω12[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * bptr.Ω12[n, λ1, n_p, λ2_p]
                     end
                 end
@@ -554,13 +555,13 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                 for λ2 in 1:N_λ2
                     λglob_2 = N_λ1 + λ2
                     χ′_nλ2 = conj(block.χ_nλ[n, λglob_2])
-                    Γ′_nλ2 = conj(block.ΣL_nλ[n, λglob_2] + block.ΣG_nλ[n, λglob_2])
+                    Γ′_nλ2 = conj(1im * (block.ΣG_nλ[n, λglob_2] - block.ΣL_nλ[n, λglob_2]))
                     for λ1_p in 1:N_λ1
                         χ_npλ1p = block.χ_nλ[n_p, λ1_p]
-                        Γ_npλ1p = block.ΣL_nλ[n_p, λ1_p] + block.ΣG_nλ[n_p, λ1_p]
+                        Γ_npλ1p = 1im * (block.ΣG_nλ[n_p, λ1_p] - block.ΣL_nλ[n_p, λ1_p])
                         term1 = -1im * Γ_npλ1p * dot3[λ2]
                         term2 = -1im * Γ′_nλ2 * dot2[λ1_p]
-                        pref3 = -1im * (χ_npλ1p - χ′_nλ2)
+                        pref3 = -1im * (χ_npλ1p + block.Δ - χ′_nλ2 - block.Δ)
                         dbptr.Ω21[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * bptr.Ω21[n, λ2, n_p, λ1_p]
                     end
                 end
