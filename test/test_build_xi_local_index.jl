@@ -1,16 +1,38 @@
 using Test
 using TDNEGF
 
-@testset "build_ξ_local_index maps local rows into global coupling" begin
-    Ns = 6
-    local_index = [2, 5]
-    U_local = ComplexF64[1 + 1im 2 - 1im; 3 + 0im 4 + 2im]
+@testset "build_ξ_an and build_ξ_local_index are equivalent" begin
+    Nx, Ny = 2, 3
+    Nσ, N_orb = 2, 1
+    Nloc = Nσ * N_orb
+    Ns = Nx * Ny * Nloc
 
-    ξ_an = build_ξ_local_index(Ns, local_index, U_local)
+    xcol = 1
+    y_coup = 1:Ny
 
-    @test size(ξ_an) == (Ns, size(U_local, 2))
-    @test ξ_an[local_index, :] == U_local
+    ξ_old = build_ξ_an(Nx, Ny, Nσ, N_orb; xcol = xcol, y_coup = y_coup)
 
-    zero_rows = setdiff(1:Ns, local_index)
-    @test ξ_an[zero_rows, :] == zeros(ComplexF64, length(zero_rows), size(U_local, 2))
+    local_index = Int[]
+    for y in y_coup
+        i = (xcol - 1) * Ny + y
+        append!(local_index, ((i - 1) * Nloc + 1):(i * Nloc))
+    end
+
+    Nc = Ny * Nloc
+    U_local = zeros(ComplexF64, length(local_index), Nc)
+
+    for (k, row) in enumerate(local_index)
+        α = (row - 1) % Nloc + 1
+        y = ((row - 1) ÷ Nloc) % Ny + 1
+        for ny_mode in 1:Ny
+            amp = sqrt(2 / (Ny + 1)) * sin(ny_mode * y * pi / (Ny + 1))
+            n = (ny_mode - 1) * Nloc + α
+            U_local[k, n] = amp
+        end
+    end
+
+    ξ_new = build_ξ_local_index(Ns, local_index, U_local)
+
+    @test size(ξ_old) == size(ξ_new)
+    @test ξ_old == ξ_new
 end
