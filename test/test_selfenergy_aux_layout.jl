@@ -39,3 +39,44 @@ end
 
     @test total_size == l1.size_block + l2.size_block
 end
+
+@testset "Heterogeneous auxiliary pointer blocks" begin
+    dims_ρ_ab = (4, 4)
+    size_ρ_ab = prod(dims_ρ_ab)
+
+    block1 = make_block(:left, 4, 2, 2, 1)
+    block2 = make_block(:right, 4, 3, 1, 2)
+    layouts, total_aux_size = build_selfenergy_aux_layout([block1, block2])
+
+    vec = zeros(ComplexF64, size_ρ_ab + total_aux_size)
+    ptr = pointer_blocks(vec, dims_ρ_ab, layouts)
+
+    @test size(ptr.ρ_ab) == dims_ρ_ab
+    @test length(ptr.blocks) == 2
+
+    b1 = ptr.blocks[1]
+    @test size(b1.Ψ_anλ) == (4, 2, 3)
+    @test size(b1.Ω11) == (2, 2, 2, 2)
+    @test size(b1.Ω12) == (2, 2, 2, 1)
+    @test size(b1.Ω21) == (2, 1, 2, 2)
+    @test first(b1.range_Ψ) == size_ρ_ab + 1
+    @test first(b1.range_Ω11) == last(b1.range_Ψ) + 1
+    @test first(b1.range_Ω12) == last(b1.range_Ω11) + 1
+    @test first(b1.range_Ω21) == last(b1.range_Ω12) + 1
+
+    b2 = ptr.blocks[2]
+    @test size(b2.Ψ_anλ) == (4, 3, 3)
+    @test size(b2.Ω11) == (3, 1, 3, 1)
+    @test size(b2.Ω12) == (3, 1, 3, 2)
+    @test size(b2.Ω21) == (3, 2, 3, 1)
+    @test first(b2.range_Ψ) == size_ρ_ab + layouts[2].offset
+    @test first(b2.range_Ω11) == last(b2.range_Ψ) + 1
+    @test first(b2.range_Ω12) == last(b2.range_Ω11) + 1
+    @test first(b2.range_Ω21) == last(b2.range_Ω12) + 1
+    @test last(b2.range_Ω21) == length(vec)
+
+    b2.Ω12[1, 1, 2, 2] = 3.0 + 4.0im
+    idx_local = LinearIndices(b2.Ω12)[1, 1, 2, 2]
+    idx_global = first(b2.range_Ω12) + idx_local - 1
+    @test vec[idx_global] == 3.0 + 4.0im
+end
