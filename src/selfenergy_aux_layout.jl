@@ -125,17 +125,21 @@ Return zero-copy views into a flattened vector with:
     layouts::AbstractVector{SelfEnergyAuxBlockLayout},
 )
     size_ρ_ab = prod(dims_ρ_ab)
+    size_aux = isempty(layouts) ? 0 : last(layouts[end].range_block)
+    required_size = size_ρ_ab + size_aux
+    length(vec) < required_size && throw(ArgumentError("vector length $(length(vec)) is smaller than required size $(required_size)"))
+
     range_ρ_ab = 1:size_ρ_ab
     ρ_ab = reshape(view(vec, range_ρ_ab), dims_ρ_ab)
 
-    aux_offset = size_ρ_ab
     block_views = Vector{SelfEnergyAuxBlockPointers}(undef, length(layouts))
+    next_idx = size_ρ_ab + 1
     for (i, layout) in enumerate(layouts)
-        shift = aux_offset + layout.offset - 1
-        range_Ψ = (first(layout.range_Ψ) + shift):(last(layout.range_Ψ) + shift)
-        range_Ω11 = (first(layout.range_Ω11) + shift):(last(layout.range_Ω11) + shift)
-        range_Ω12 = (first(layout.range_Ω12) + shift):(last(layout.range_Ω12) + shift)
-        range_Ω21 = (first(layout.range_Ω21) + shift):(last(layout.range_Ω21) + shift)
+        range_Ψ = next_idx:(next_idx + layout.size_Ψ - 1)
+        range_Ω11 = (last(range_Ψ) + 1):(last(range_Ψ) + layout.size_Ω11)
+        range_Ω12 = (last(range_Ω11) + 1):(last(range_Ω11) + layout.size_Ω12)
+        range_Ω21 = (last(range_Ω12) + 1):(last(range_Ω12) + layout.size_Ω21)
+        next_idx = last(range_Ω21) + 1
 
         Ψ_anλ = reshape(view(vec, range_Ψ), (layout.Ns, layout.Nc, layout.N_λ))
         Ω11 = reshape(view(vec, range_Ω11), (layout.Nc, layout.N_λ1, layout.Nc, layout.N_λ1))
@@ -154,6 +158,7 @@ Return zero-copy views into a flattened vector with:
             range_Ω21 = range_Ω21,
         )
     end
+    next_idx - 1 == required_size || throw(ArgumentError("layout sizes are inconsistent with flattened vector size"))
 
     return HeterogeneousAuxPointers(ρ_ab = ρ_ab, blocks = block_views)
 end
