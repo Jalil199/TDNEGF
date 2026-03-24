@@ -31,7 +31,7 @@ module TDNEGF
     # functions from hamiltonians.jl"
     export build_H_ab, update_H_e!
     # functions from eom_tdnegf.jl"
-    export eom_tdnegf!
+    export eom_tdnegf!, eom_tdnegf_blocks!, ExperimentalBlockRHSParams
     # functions from observables.jl"
     export ObservablesTDNEGF, obs_s_i!, obs_σ_i!, obs_n_i!,obs_Ixα!, get_sub, obs_σ_i_eq!
     # functions from poles.jl"
