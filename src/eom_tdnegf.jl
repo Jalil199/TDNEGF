@@ -370,8 +370,19 @@ end
 
 function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{SelfEnergyBlock})
     Ns = size(H_ab, 1)
+    size(H_ab, 2) == Ns || throw(ArgumentError("H_ab must be square"))
     dims_ρ_ab = (Ns, Ns)
     layouts, _ = build_selfenergy_aux_layout(blocks)
+
+    for (i, block) in enumerate(blocks)
+        layout = layouts[i]
+        size(block.ξ_an, 1) == Ns || throw(ArgumentError("block $(block.name) has incompatible ξ_an row-size; expected $Ns, got $(size(block.ξ_an, 1))"))
+        block.N_λ == block.N_λ1 + block.N_λ2 || throw(ArgumentError("block $(block.name) has inconsistent λ split: N_λ=$(block.N_λ), N_λ1+N_λ2=$(block.N_λ1 + block.N_λ2)"))
+        layout.Nc == block.Nc || throw(ArgumentError("layout/block Nc mismatch for block $(block.name)"))
+        layout.N_λ1 == block.N_λ1 || throw(ArgumentError("layout/block N_λ1 mismatch for block $(block.name)"))
+        layout.N_λ2 == block.N_λ2 || throw(ArgumentError("layout/block N_λ2 mismatch for block $(block.name)"))
+        layout.N_λ == block.N_λ || throw(ArgumentError("layout/block N_λ mismatch for block $(block.name)"))
+    end
 
     Ψ_an = [zeros(ComplexF64, Ns, b.Nc) for b in blocks]
     HΨ = [zeros(ComplexF64, Ns, b.Nc, b.N_λ) for b in blocks]
