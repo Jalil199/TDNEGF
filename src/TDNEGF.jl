@@ -7,6 +7,7 @@ module TDNEGF
     ⊗(A,B) = kron(A,B) ;
     include("types.jl")
     include("selfenergies.jl")
+    include("selfenergy_aux_layout.jl")
     # if only this element is included thus
     # the function are called as 
     # TDNEGF.SelfEnergySquare.function
@@ -19,7 +20,7 @@ module TDNEGF
     
     ### main function to export from types.jl
     export ModelParamsTDNEGF, DynamicalVariables, pointer
-    export SelfEnergyBlock
+    export SelfEnergyBlock, SelfEnergyAuxBlockLayout, build_selfenergy_aux_layout
     ### Submodule of self energy for square lattice
     # Bring functions to the name space of module 
     using .SelfEnergySquare: build_Σᴸ_nλ, build_Σᴳ_nλ,
