@@ -178,7 +178,7 @@ end
     @test total_aux == p_rect.size_u - p_rect.size_ρ_ab
 
     ptr = pointer_blocks(copy(u), p_blocks.dims_ρ_ab, layouts)
-    ptr_rect = pointer(copy(u), p_rect)
+    ptr_rect = TDNEGF.pointer(copy(u), p_rect)
 
     @test ptr.ρ_ab == ptr_rect.ρ_ab
     @test ptr.blocks[1].Ψ_anλ == ptr_rect.Ψ_anλα[:, :, :, 1]
