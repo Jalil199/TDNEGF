@@ -441,9 +441,9 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
         tmp_λ2p = [zeros(ComplexF64, b.N_λ2) for b in blocks],
         obs_N_sites = 0,
         obs_N_loc = 0,
-        obs_σ_x = @SMatrix [0.0 1.0; 1.0 0.0],
-        obs_σ_y = @SMatrix [0.0 -1im; 1im 0.0],
-        obs_σ_z = @SMatrix [1.0 0.0; 0.0 -1.0],
+        obs_σ_x = SMatrix{2,2,Float64,4}(0.0, 1.0, 1.0, 0.0),
+        obs_σ_y = SMatrix{2,2,ComplexF64,4}(0.0 + 0.0im, -1im, 1im, 0.0 + 0.0im),
+        obs_σ_z = SMatrix{2,2,Float64,4}(1.0, 0.0, 0.0, -1.0),
         obs_site_ranges = UnitRange{Int}[]
     )
 end
