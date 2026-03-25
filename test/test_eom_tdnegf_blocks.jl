@@ -184,3 +184,9 @@ end
 
     @test u_rect_t ≈ u_blocks_t_as_rect rtol = 1e-11 atol = 1e-11
 end
+
+# Lightweight local performance check (optional):
+#   p_rect, p_blocks, u_rect, u_blocks = build_equivalent_rhs_setup_multiblock()
+#   du_rect = similar(u_rect); du_blocks = similar(u_blocks)
+#   @time eom_tdnegf!(du_rect, u_rect, p_rect, 0.0)
+#   @time eom_tdnegf_blocks!(du_blocks, u_blocks, p_blocks, 0.0)

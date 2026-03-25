@@ -368,7 +368,12 @@ per-RHS allocations.
 Base.@kwdef struct ExperimentalBlockRHSParams
     H_ab::Matrix{ComplexF64}
     dims_ρ_ab::NTuple{2,Int}
+    size_ρ_ab::Int
     aux_layout::SelfEnergyAuxLayout
+    block_ranges_Ψ::Vector{UnitRange{Int}}
+    pair_ranges_Ω11::Matrix{UnitRange{Int}}
+    pair_ranges_Ω12::Matrix{UnitRange{Int}}
+    pair_ranges_Ω21::Matrix{UnitRange{Int}}
     blocks::Vector{SelfEnergyBlock}
     Hρ::Matrix{ComplexF64}
     Π_ab::Matrix{ComplexF64}
@@ -397,7 +402,24 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
     Ns = size(H_ab, 1)
     size(H_ab, 2) == Ns || throw(ArgumentError("H_ab must be square"))
     dims_ρ_ab = (Ns, Ns)
+    size_ρ_ab = Ns * Ns
     aux_layout = build_selfenergy_aux_layout(blocks)
+
+    nblocks = length(blocks)
+    block_ranges_Ψ = Vector{UnitRange{Int}}(undef, nblocks)
+    pair_ranges_Ω11 = Matrix{UnitRange{Int}}(undef, nblocks, nblocks)
+    pair_ranges_Ω12 = Matrix{UnitRange{Int}}(undef, nblocks, nblocks)
+    pair_ranges_Ω21 = Matrix{UnitRange{Int}}(undef, nblocks, nblocks)
+
+    for i in 1:nblocks
+        block_ranges_Ψ[i] = (first(aux_layout.block_layouts[i].range_Ψ) + size_ρ_ab):(last(aux_layout.block_layouts[i].range_Ψ) + size_ρ_ab)
+        for j in 1:nblocks
+            pl = aux_layout.pair_layouts[i, j]
+            pair_ranges_Ω11[i, j] = (first(pl.range_Ω11) + size_ρ_ab):(last(pl.range_Ω11) + size_ρ_ab)
+            pair_ranges_Ω12[i, j] = (first(pl.range_Ω12) + size_ρ_ab):(last(pl.range_Ω12) + size_ρ_ab)
+            pair_ranges_Ω21[i, j] = (first(pl.range_Ω21) + size_ρ_ab):(last(pl.range_Ω21) + size_ρ_ab)
+        end
+    end
 
     for (i, block) in enumerate(blocks)
         block_layout = aux_layout.block_layouts[i]
@@ -422,7 +444,12 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
     return ExperimentalBlockRHSParams(
         H_ab = H_ab,
         dims_ρ_ab = dims_ρ_ab,
+        size_ρ_ab = size_ρ_ab,
         aux_layout = aux_layout,
+        block_ranges_Ψ = block_ranges_Ψ,
+        pair_ranges_Ω11 = pair_ranges_Ω11,
+        pair_ranges_Ω12 = pair_ranges_Ω12,
+        pair_ranges_Ω21 = pair_ranges_Ω21,
         blocks = blocks,
         Hρ = zeros(ComplexF64, Ns, Ns),
         Π_ab = zeros(ComplexF64, Ns, Ns),
@@ -461,7 +488,12 @@ function ExperimentalBlockRHSParams(
     return ExperimentalBlockRHSParams(
         H_ab = p.H_ab,
         dims_ρ_ab = p.dims_ρ_ab,
+        size_ρ_ab = p.size_ρ_ab,
         aux_layout = p.aux_layout,
+        block_ranges_Ψ = p.block_ranges_Ψ,
+        pair_ranges_Ω11 = p.pair_ranges_Ω11,
+        pair_ranges_Ω12 = p.pair_ranges_Ω12,
+        pair_ranges_Ω21 = p.pair_ranges_Ω21,
         blocks = p.blocks,
         Hρ = p.Hρ,
         Π_ab = p.Π_ab,
@@ -498,26 +530,22 @@ The equations are the same as the legacy ξ-based path, but applied per block
 and per ordered block pair `(i, j)`.
 """
 function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::ExperimentalBlockRHSParams, t)
-    # Create zero-copy typed views over flattened input/output state vectors.
-    ptr = pointer_blocks(u, p.dims_ρ_ab, p.aux_layout)
-    dptr = pointer_blocks(du, p.dims_ρ_ab, p.aux_layout)
+    # Hot-path optimization: avoid rebuilding pointer container hierarchies on each RHS call.
+    ρ_ab = reshape(view(u, 1:p.size_ρ_ab), p.dims_ρ_ab)
+    dρ_ab = reshape(view(du, 1:p.size_ρ_ab), p.dims_ρ_ab)
+    Ns = p.dims_ρ_ab[1]
 
-    ρ_ab = ptr.ρ_ab
-    dρ_ab = dptr.ρ_ab
-    Ns = p.aux_layout.block_layouts[1].Ns
-
-    # Π_ab is accumulated across all source blocks in the first pass.
     fill!(p.Π_ab, 0.0 + 0.0im)
 
-    @inbounds for i in eachindex(ptr.blocks)
-        bptr_i = ptr.blocks[i]
-        dbptr_i = dptr.blocks[i]
+    @inbounds for i in eachindex(p.blocks)
         block_i = p.blocks[i]
-
         Nc_i = block_i.Nc
         N_λ1_i = block_i.N_λ1
         N_λ2_i = block_i.N_λ2
         N_λ_i = block_i.N_λ
+
+        Ψ_i = reshape(view(u, p.block_ranges_Ψ[i]), (Ns, Nc_i, N_λ_i))
+        dΨ_i = reshape(view(du, p.block_ranges_Ψ[i]), (Ns, Nc_i, N_λ_i))
 
         Ψ_an_i = p.Ψ_an[i]
         HΨ_i = p.HΨ[i]
@@ -526,24 +554,19 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
         Σᴸ′_i = p.Σᴸ′[i]
         Γ′_i = p.Γ′[i]
 
-        # Collapse λ into Ψ_an_i[a,n] = Σ_λ Ψ_anλ[a,n,λ] (legacy Ψ_an reduction).
-        @inbounds for n in 1:Nc_i, a in 1:Ns
+        for n in 1:Nc_i, a in 1:Ns
             acc = 0.0 + 0.0im
             @simd for λ in 1:N_λ_i
-                acc += bptr_i.Ψ_anλ[a, n, λ]
+                acc += Ψ_i[a, n, λ]
             end
             Ψ_an_i[a, n] = acc
         end
 
-        # Batched products reused in the local Ψ RHS:
-        # HΨ_i = H_ab * Ψ_i and ρξ_i = ρ_ab * ξ_i.
-        mul!(reshape(HΨ_i, Ns, Nc_i * N_λ_i), p.H_ab, reshape(bptr_i.Ψ_anλ, Ns, Nc_i * N_λ_i))
+        mul!(reshape(HΨ_i, Ns, Nc_i * N_λ_i), p.H_ab, reshape(Ψ_i, Ns, Nc_i * N_λ_i))
         mul!(ρξ_i, ρ_ab, block_i.ξ_an)
-
-        # Add this block contribution to the global Π_ab source term.
         mul!(p.Π_ab, Ψ_an_i, transpose(block_i.ξ_an), 1.0 + 0.0im, 1.0 + 0.0im)
 
-        @inbounds for n in 1:Nc_i
+        for n in 1:Nc_i
             ξ_n = @view block_i.ξ_an[:, n]
             ρξ_n = @view ρξ_i[:, n]
 
@@ -552,13 +575,12 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                 Σᴸ′ = Σᴸ′_i[n, λ]
                 Γ′ = Γ′_i[n, λ]
 
-                # Coefficients follow the same decomposition as the legacy path.
                 coef_χΨ = 1im * (χ′ + block_i.Δ)
                 coef_Σξ = 1im * Σᴸ′
                 coef_Γρξ = -Γ′
 
-                dΨ_nλ = @view dbptr_i.Ψ_anλ[:, n, λ]
-                Ψ_nλ = @view bptr_i.Ψ_anλ[:, n, λ]
+                dΨ_nλ = @view dΨ_i[:, n, λ]
+                Ψ_nλ = @view Ψ_i[:, n, λ]
                 HΨ_nλ = @view HΨ_i[:, n, λ]
 
                 @simd for a in 1:Ns
@@ -567,29 +589,27 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
             end
         end
 
-        # Ω -> Ψ coupling terms:
-        # - λ1 rows receive Ω11 + Ω12 couplings against ξ of every target block j.
-        # - λ2 rows receive Ω21 couplings.
-        @inbounds for n in 1:Nc_i
+        for n in 1:Nc_i
             for λ1 in 1:N_λ1_i
                 fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
 
-                for j in eachindex(ptr.blocks)
-                    pair_ij = ptr.Ω_pairs[i, j]
+                for j in eachindex(p.blocks)
                     block_j = p.blocks[j]
                     Nc_j = block_j.Nc
                     N_λ1_j = block_j.N_λ1
                     N_λ2_j = block_j.N_λ2
 
+                    Ω11_ij = reshape(view(u, p.pair_ranges_Ω11[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ1_j))
+                    Ω12_ij = reshape(view(u, p.pair_ranges_Ω12[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ2_j))
+
                     for n_p in 1:Nc_j
                         coeff = 0.0 + 0.0im
                         @simd for λ1_p in 1:N_λ1_j
-                            coeff += pair_ij.Ω11[n, λ1, n_p, λ1_p]
+                            coeff += Ω11_ij[n, λ1, n_p, λ1_p]
                         end
                         @simd for λ2_p in 1:N_λ2_j
-                            coeff += pair_ij.Ω12[n, λ1, n_p, λ2_p]
+                            coeff += Ω12_ij[n, λ1, n_p, λ2_p]
                         end
-                        # coeff aggregates over target λ sectors before applying ξ_j[:, n_p].
                         coeff *= -1im
 
                         ξ_np = @view block_j.ξ_an[:, n_p]
@@ -599,7 +619,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                     end
                 end
 
-                dΨ = @view dbptr_i.Ψ_anλ[:, n, λ1]
+                dΨ = @view dΨ_i[:, n, λ1]
                 @simd for a in 1:Ns
                     dΨ[a] += p.tmp_Ψ_vec[a]
                 end
@@ -609,16 +629,17 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                 λ = N_λ1_i + λ2
                 fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
 
-                for j in eachindex(ptr.blocks)
-                    pair_ij = ptr.Ω_pairs[i, j]
+                for j in eachindex(p.blocks)
                     block_j = p.blocks[j]
                     Nc_j = block_j.Nc
                     N_λ1_j = block_j.N_λ1
 
+                    Ω21_ij = reshape(view(u, p.pair_ranges_Ω21[i, j]), (Nc_i, N_λ2_i, Nc_j, N_λ1_j))
+
                     for n_p in 1:Nc_j
                         coeff = 0.0 + 0.0im
                         @simd for λ1_p in 1:N_λ1_j
-                            coeff += pair_ij.Ω21[n, λ2, n_p, λ1_p]
+                            coeff += Ω21_ij[n, λ2, n_p, λ1_p]
                         end
                         coeff *= -1im
 
@@ -629,7 +650,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                     end
                 end
 
-                dΨ = @view dbptr_i.Ψ_anλ[:, n, λ]
+                dΨ = @view dΨ_i[:, n, λ]
                 @simd for a in 1:Ns
                     dΨ[a] += p.tmp_Ψ_vec[a]
                 end
@@ -637,70 +658,69 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
         end
     end
 
-    # Second pass: build Ω RHS for every ordered pair (i,j).
-    @inbounds for i in eachindex(ptr.blocks)
-        bptr_i = ptr.blocks[i]
+    @inbounds for i in eachindex(p.blocks)
         block_i = p.blocks[i]
         Nc_i = block_i.Nc
         N_λ1_i = block_i.N_λ1
         N_λ2_i = block_i.N_λ2
+        Ψ_i = reshape(view(u, p.block_ranges_Ψ[i]), (Ns, Nc_i, block_i.N_λ))
+
         χ′_i = p.χ′[i]
         Γ′_i = p.Γ′[i]
-
         dot1 = p.tmp_λ1[i]
         dot3 = p.tmp_λ2[i]
 
-        for j in eachindex(ptr.blocks)
-            bptr_j = ptr.blocks[j]
+        for j in eachindex(p.blocks)
             block_j = p.blocks[j]
             Nc_j = block_j.Nc
             N_λ1_j = block_j.N_λ1
             N_λ2_j = block_j.N_λ2
+
+            Ψ_j = reshape(view(u, p.block_ranges_Ψ[j]), (Ns, Nc_j, block_j.N_λ))
+            Ω11_ij = reshape(view(u, p.pair_ranges_Ω11[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ1_j))
+            Ω12_ij = reshape(view(u, p.pair_ranges_Ω12[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ2_j))
+            Ω21_ij = reshape(view(u, p.pair_ranges_Ω21[i, j]), (Nc_i, N_λ2_i, Nc_j, N_λ1_j))
+
+            dΩ11_ij = reshape(view(du, p.pair_ranges_Ω11[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ1_j))
+            dΩ12_ij = reshape(view(du, p.pair_ranges_Ω12[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ2_j))
+            dΩ21_ij = reshape(view(du, p.pair_ranges_Ω21[i, j]), (Nc_i, N_λ2_i, Nc_j, N_λ1_j))
+
             χ_j = block_j.χ_nλ
             Γ_j = p.Γ[j]
-
             dot2 = p.tmp_λ1p[j]
             dot4 = p.tmp_λ2p[j]
-
-            pair_ij = ptr.Ω_pairs[i, j]
-            dpair_ij = dptr.Ω_pairs[i, j]
 
             for n in 1:Nc_i
                 ξ_i_n = @view block_i.ξ_an[:, n]
                 for n_p in 1:Nc_j
                     ξ_j_np = @view block_j.ξ_an[:, n_p]
 
-                    # Dot caches avoid recomputing ξ·Ψ contractions in inner Ω loops.
                     for λ1 in 1:N_λ1_i
-                        dot1[λ1] = dot(ξ_j_np, @view bptr_i.Ψ_anλ[:, n, λ1])
+                        dot1[λ1] = dot(ξ_j_np, @view Ψ_i[:, n, λ1])
                     end
                     for λ1_p in 1:N_λ1_j
-                        dot2[λ1_p] = conj(dot(ξ_i_n, @view bptr_j.Ψ_anλ[:, n_p, λ1_p]))
+                        dot2[λ1_p] = conj(dot(ξ_i_n, @view Ψ_j[:, n_p, λ1_p]))
                     end
                     for λ2 in 1:N_λ2_i
-                        dot3[λ2] = dot(ξ_j_np, @view bptr_i.Ψ_anλ[:, n, N_λ1_i + λ2])
+                        dot3[λ2] = dot(ξ_j_np, @view Ψ_i[:, n, N_λ1_i + λ2])
                     end
                     for λ2_p in 1:N_λ2_j
-                        dot4[λ2_p] = conj(dot(ξ_i_n, @view bptr_j.Ψ_anλ[:, n_p, N_λ1_j + λ2_p]))
+                        dot4[λ2_p] = conj(dot(ξ_i_n, @view Ψ_j[:, n_p, N_λ1_j + λ2_p]))
                     end
 
-                    # Ω11 block update.
                     for λ1 in 1:N_λ1_i
                         χ′_nλ1 = χ′_i[n, λ1]
                         Γ′_nλ1 = Γ′_i[n, λ1]
                         for λ1_p in 1:N_λ1_j
                             χ_j_npl1p = χ_j[n_p, λ1_p]
                             Γ_j_npl1p = Γ_j[n_p, λ1_p]
-
                             term1 = -1im * Γ_j_npl1p * dot1[λ1]
                             term2 = -1im * Γ′_nλ1 * dot2[λ1_p]
                             pref3 = -1im * (χ_j_npl1p + block_j.Δ - χ′_nλ1 - block_i.Δ)
-
-                            dpair_ij.Ω11[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * pair_ij.Ω11[n, λ1, n_p, λ1_p]
+                            dΩ11_ij[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * Ω11_ij[n, λ1, n_p, λ1_p]
                         end
                     end
 
-                    # Ω12 block update.
                     for λ1 in 1:N_λ1_i
                         χ′_nλ1 = χ′_i[n, λ1]
                         Γ′_nλ1 = Γ′_i[n, λ1]
@@ -708,16 +728,13 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                             λglob_2p = N_λ1_j + λ2_p
                             χ_j_npl2p = χ_j[n_p, λglob_2p]
                             Γ_j_npl2p = Γ_j[n_p, λglob_2p]
-
                             term1 = -1im * Γ_j_npl2p * dot1[λ1]
                             term2 = -1im * Γ′_nλ1 * dot4[λ2_p]
                             pref3 = -1im * (χ_j_npl2p + block_j.Δ - χ′_nλ1 - block_i.Δ)
-
-                            dpair_ij.Ω12[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * pair_ij.Ω12[n, λ1, n_p, λ2_p]
+                            dΩ12_ij[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * Ω12_ij[n, λ1, n_p, λ2_p]
                         end
                     end
 
-                    # Ω21 block update.
                     for λ2 in 1:N_λ2_i
                         λglob_2 = N_λ1_i + λ2
                         χ′_nλ2 = χ′_i[n, λglob_2]
@@ -725,12 +742,10 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                         for λ1_p in 1:N_λ1_j
                             χ_j_npl1p = χ_j[n_p, λ1_p]
                             Γ_j_npl1p = Γ_j[n_p, λ1_p]
-
                             term1 = -1im * Γ_j_npl1p * dot3[λ2]
                             term2 = -1im * Γ′_nλ2 * dot2[λ1_p]
                             pref3 = -1im * (χ_j_npl1p + block_j.Δ - χ′_nλ2 - block_i.Δ)
-
-                            dpair_ij.Ω21[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * pair_ij.Ω21[n, λ2, n_p, λ1_p]
+                            dΩ21_ij[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * Ω21_ij[n, λ2, n_p, λ1_p]
                         end
                     end
                 end
@@ -738,8 +753,6 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
         end
     end
 
-    # Global density-matrix equation uses the Π_ab accumulated over all blocks.
     _rhs_ρ!(dρ_ab, ρ_ab, p.H_ab, p.Hρ, p.Π_ab, p.dims_ρ_ab[1])
-
     return nothing
 end
