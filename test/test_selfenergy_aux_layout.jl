@@ -7,8 +7,7 @@ function make_block(name::Symbol, Ns::Int, Nc::Int, N_λ1::Int, N_λ2::Int)
     ΣG_nλ = zeros(ComplexF64, Nc, N_λ)
     χ_nλ = zeros(ComplexF64, Nc, N_λ)
     ξ_an = zeros(ComplexF64, Ns, Nc)
-    Δ = 0.0 + 0.0im
-    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
+    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
 end
 
 @testset "Self-energy auxiliary pair layout" begin

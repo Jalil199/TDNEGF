@@ -51,10 +51,9 @@ function build_homogeneous_setup_blocks(p_rect::ModelParamsTDNEGF)
         copy(p_rect.Σᴳ_nλα[:, :, 1]),
         copy(p_rect.χ_nλα[:, :, 1]),
         copy(p_rect.ξ_anα[:, :, 1]),
-        p_rect.Δ_α[1],
     )
 
-    return ExperimentalBlockRHSParams(copy(p_rect.H_ab), [block])
+    return ExperimentalBlockRHSParams(copy(p_rect.H_ab), [block], copy(p_rect.Δ_α))
 end
 
 function load_baseline_module(baseline_sha::AbstractString)

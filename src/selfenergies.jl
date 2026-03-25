@@ -9,6 +9,10 @@ Shape conventions (all per block):
 - `ξ_an`: `(Ns, Nc)` where `Ns` is the system Hilbert-space size
 - `N_λ = N_λ1 + N_λ2` splits poles exactly as in the legacy solver's
   `(λ1, λ2)` sectors (`Ω11`, `Ω12`, `Ω21`).
+
+`SelfEnergyBlock` intentionally stores only static structural data.
+Dynamic energy shifts (Δ) live in solver-level parameters (`Δ_blocks`) so
+bias scans/time-dependent workflows can update Δ without rebuilding blocks.
 """
 struct SelfEnergyBlock
     name::Symbol
@@ -20,7 +24,6 @@ struct SelfEnergyBlock
     ΣG_nλ::Matrix{ComplexF64}
     χ_nλ::Matrix{ComplexF64}
     ξ_an::Matrix{ComplexF64}
-    Δ::ComplexF64
 
     function SelfEnergyBlock(
         name::Symbol,
@@ -32,7 +35,6 @@ struct SelfEnergyBlock
         ΣG_nλ::Matrix{ComplexF64},
         χ_nλ::Matrix{ComplexF64},
         ξ_an::Matrix{ComplexF64},
-        Δ::ComplexF64,
     )
         Nc > 0 || throw(ArgumentError("Nc must be positive"))
         N_λ1 ≥ 0 || throw(ArgumentError("N_λ1 must be non-negative"))
@@ -43,12 +45,12 @@ struct SelfEnergyBlock
         size(χ_nλ) == (Nc, N_λ) || throw(ArgumentError("size(χ_nλ) must be (Nc, N_λ)"))
         size(ξ_an, 2) == Nc || throw(ArgumentError("size(ξ_an, 2) must equal Nc"))
 
-        return new(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
+        return new(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
     end
 end
 
 """
-    SelfEnergyBlock(name, Nc, N_λ1, N_λ2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
+    SelfEnergyBlock(name, Nc, N_λ1, N_λ2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
 
 Primary constructor for auxiliary blocks.
 `N_λ1` and `N_λ2` must be provided explicitly to avoid ambiguous or inconsistent
@@ -63,10 +65,9 @@ function SelfEnergyBlock(
     ΣG_nλ::Matrix{ComplexF64},
     χ_nλ::Matrix{ComplexF64},
     ξ_an::Matrix{ComplexF64},
-    Δ::ComplexF64,
 )
     _, N_λ = size(ΣL_nλ)
-    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
+    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
 end
 
 function SelfEnergyBlock(
@@ -77,8 +78,7 @@ function SelfEnergyBlock(
     ΣG_nλ::Matrix{ComplexF64},
     χ_nλ::Matrix{ComplexF64},
     ξ_an::Matrix{ComplexF64},
-    Δ::ComplexF64,
 )
     Nc, N_λ = size(ΣL_nλ)
-    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
+    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
 end
