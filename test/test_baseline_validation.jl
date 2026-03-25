@@ -174,15 +174,15 @@ end
     @test dρ_rect ≈ adjoint(dρ_rect) rtol = 1e-12 atol = 1e-12
     @test dρ_blocks ≈ adjoint(dρ_blocks) rtol = 1e-12 atol = 1e-12
 
-    layouts, total_aux = build_selfenergy_aux_layout(p_blocks.blocks)
-    @test total_aux == p_rect.size_u - p_rect.size_ρ_ab
+    aux_layout = build_selfenergy_aux_layout(p_blocks.blocks)
+    @test aux_layout.total_size == p_rect.size_u - p_rect.size_ρ_ab
 
-    ptr = pointer_blocks(copy(u), p_blocks.dims_ρ_ab, layouts)
+    ptr = pointer_blocks(copy(u), p_blocks.dims_ρ_ab, aux_layout)
     ptr_rect = TDNEGF.pointer(copy(u), p_rect)
 
     @test ptr.ρ_ab == ptr_rect.ρ_ab
     @test ptr.blocks[1].Ψ_anλ == ptr_rect.Ψ_anλα[:, :, :, 1]
-    @test ptr.blocks[1].Ω11 == ptr_rect.Ω_nλ1α_nλ1α[:, :, 1, :, :, 1]
-    @test ptr.blocks[1].Ω12 == ptr_rect.Ω_nλ1α_nλ2α[:, :, 1, :, :, 1]
-    @test ptr.blocks[1].Ω21 == ptr_rect.Ω_nλ2α_nλ1α[:, :, 1, :, :, 1]
+    @test ptr.Ω_pairs[1, 1].Ω11 == ptr_rect.Ω_nλ1α_nλ1α[:, :, 1, :, :, 1]
+    @test ptr.Ω_pairs[1, 1].Ω12 == ptr_rect.Ω_nλ1α_nλ2α[:, :, 1, :, :, 1]
+    @test ptr.Ω_pairs[1, 1].Ω21 == ptr_rect.Ω_nλ2α_nλ1α[:, :, 1, :, :, 1]
 end
