@@ -42,8 +42,8 @@ function init_params(;Nx::Int=50, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
     χ_nλ    = build_χ_nλ(zλ, p.Ny, p.Nσ, p.N_orb, p.N_λ1, p.N_λ2; β=β, γ=1.0)
     ξ_anR   = build_ξ_an(p.Nx, p.Ny, p.Nσ, p.N_orb; xcol = p.Nx,y_coup = 1:p.Ny)
     ξ_anL   = build_ξ_an(p.Nx, p.Ny, p.Nσ, p.N_orb; xcol = 1,y_coup = 1:p.Ny)
-    left_block  = SelfEnergyBlock(:left,  p.N_λ1, p.N_λ2, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL,  0.5 + 0.0im)
-    right_block = SelfEnergyBlock(:right, p.N_λ1, p.N_λ2, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR, -0.5 + 0.0im)
+    left_block  = SelfEnergyBlock(:left,  p.Nc, p.N_λ1, p.N_λ2, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL,  0.5 + 0.0im)
+    right_block = SelfEnergyBlock(:right, p.Nc, p.N_λ1, p.N_λ2, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR, -0.5 + 0.0im)
     #### Asigning initial values of the precalculated things
     p.H_ab             .= H_ab
     p.H0_ab            .= H_ab
