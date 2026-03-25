@@ -444,7 +444,7 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
         obs_σ_x = @SMatrix [0.0 1.0; 1.0 0.0],
         obs_σ_y = @SMatrix [0.0 -1im; 1im 0.0],
         obs_σ_z = @SMatrix [1.0 0.0; 0.0 -1.0],
-        obs_site_ranges = UnitRange{Int}[],
+        obs_site_ranges = UnitRange{Int}[]
     )
 end
 
