@@ -372,6 +372,7 @@ Base.@kwdef struct ExperimentalBlockRHSParams
     blocks::Vector{SelfEnergyBlock}
     Hρ::Matrix{ComplexF64}
     Π_ab::Matrix{ComplexF64}
+    Π_abα_obs::Array{ComplexF64,3}
     Ψ_an::Vector{Matrix{ComplexF64}}
     HΨ::Vector{Array{ComplexF64,3}}
     ρξ::Vector{Matrix{ComplexF64}}
@@ -384,6 +385,12 @@ Base.@kwdef struct ExperimentalBlockRHSParams
     tmp_λ1p::Vector{Vector{ComplexF64}}
     tmp_λ2::Vector{Vector{ComplexF64}}
     tmp_λ2p::Vector{Vector{ComplexF64}}
+    obs_N_sites::Int
+    obs_N_loc::Int
+    obs_σ_x::SMatrix{2,2,Float64,4}
+    obs_σ_y::SMatrix{2,2,ComplexF64,4}
+    obs_σ_z::SMatrix{2,2,Float64,4}
+    obs_site_ranges::Vector{UnitRange{Int}}
 end
 
 function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{SelfEnergyBlock})
@@ -419,6 +426,7 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
         blocks = blocks,
         Hρ = zeros(ComplexF64, Ns, Ns),
         Π_ab = zeros(ComplexF64, Ns, Ns),
+        Π_abα_obs = zeros(ComplexF64, Ns, Ns, length(blocks)),
         Ψ_an = Ψ_an,
         HΨ = HΨ,
         ρξ = ρξ,
@@ -431,6 +439,47 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
         tmp_λ1p = [zeros(ComplexF64, b.N_λ1) for b in blocks],
         tmp_λ2 = [zeros(ComplexF64, b.N_λ2) for b in blocks],
         tmp_λ2p = [zeros(ComplexF64, b.N_λ2) for b in blocks],
+        obs_N_sites = 0,
+        obs_N_loc = 0,
+        obs_σ_x = @SMatrix [0.0 1.0; 1.0 0.0],
+        obs_σ_y = @SMatrix [0.0 -1im; 1im 0.0],
+        obs_σ_z = @SMatrix [1.0 0.0; 0.0 -1.0],
+        obs_site_ranges = UnitRange{Int}[],
+    )
+end
+
+function ExperimentalBlockRHSParams(
+    H_ab::Matrix{ComplexF64},
+    blocks::Vector{SelfEnergyBlock},
+    p_obs::ModelParamsTDNEGF,
+)
+    p = ExperimentalBlockRHSParams(H_ab, blocks)
+    return ExperimentalBlockRHSParams(
+        H_ab = p.H_ab,
+        dims_ρ_ab = p.dims_ρ_ab,
+        aux_layout = p.aux_layout,
+        blocks = p.blocks,
+        Hρ = p.Hρ,
+        Π_ab = p.Π_ab,
+        Π_abα_obs = p.Π_abα_obs,
+        Ψ_an = p.Ψ_an,
+        HΨ = p.HΨ,
+        ρξ = p.ρξ,
+        χ′ = p.χ′,
+        Σᴸ′ = p.Σᴸ′,
+        Γ = p.Γ,
+        Γ′ = p.Γ′,
+        tmp_Ψ_vec = p.tmp_Ψ_vec,
+        tmp_λ1 = p.tmp_λ1,
+        tmp_λ1p = p.tmp_λ1p,
+        tmp_λ2 = p.tmp_λ2,
+        tmp_λ2p = p.tmp_λ2p,
+        obs_N_sites = p_obs.N_sites,
+        obs_N_loc = p_obs.N_loc,
+        obs_σ_x = p_obs.σ_x,
+        obs_σ_y = p_obs.σ_y,
+        obs_σ_z = p_obs.σ_z,
+        obs_site_ranges = [((i - 1) * p_obs.N_loc + 1):(i * p_obs.N_loc) for i in 1:p_obs.N_sites],
     )
 end
 
