@@ -88,7 +88,7 @@ function build_equivalent_rhs_setup_multiblock()
 end
 
 function copy_rect_to_blocks!(u_blocks::Vector{ComplexF64}, u_rect::Vector{ComplexF64}, p_rect::ModelParamsTDNEGF, p_blocks::ExperimentalBlockRHSParams)
-    rect = pointer(u_rect, p_rect)
+    rect = TDNEGF.pointer(u_rect, p_rect)
     blk = pointer_blocks(u_blocks, p_blocks.dims_ρ_ab, p_blocks.aux_layout)
 
     blk.ρ_ab .= rect.ρ_ab
@@ -110,7 +110,7 @@ function copy_rect_to_blocks!(u_blocks::Vector{ComplexF64}, u_rect::Vector{Compl
 end
 
 function copy_blocks_to_rect!(u_rect::Vector{ComplexF64}, u_blocks::Vector{ComplexF64}, p_rect::ModelParamsTDNEGF, p_blocks::ExperimentalBlockRHSParams)
-    rect = pointer(u_rect, p_rect)
+    rect = TDNEGF.pointer(u_rect, p_rect)
     blk = pointer_blocks(u_blocks, p_blocks.dims_ρ_ab, p_blocks.aux_layout)
 
     rect.ρ_ab .= blk.ρ_ab
