@@ -82,3 +82,48 @@ function SelfEnergyBlock(
     Nc, N_λ = size(ΣL_nλ)
     return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
 end
+
+# Backward-compatible constructors: older call sites pass a static Δ value per
+# block. Δ is now solver-level state (`Δ_blocks`), so these overloads preserve
+# source compatibility while intentionally ignoring the trailing argument.
+function SelfEnergyBlock(
+    name::Symbol,
+    Nc::Int,
+    N_λ1::Int,
+    N_λ2::Int,
+    ΣL_nλ::Matrix{ComplexF64},
+    ΣG_nλ::Matrix{ComplexF64},
+    χ_nλ::Matrix{ComplexF64},
+    ξ_an::Matrix{ComplexF64},
+    ::ComplexF64,
+)
+    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
+end
+
+function SelfEnergyBlock(
+    name::Symbol,
+    Nc::Int,
+    N_λ1::Int,
+    N_λ2::Int,
+    N_λ::Int,
+    ΣL_nλ::Matrix{ComplexF64},
+    ΣG_nλ::Matrix{ComplexF64},
+    χ_nλ::Matrix{ComplexF64},
+    ξ_an::Matrix{ComplexF64},
+    ::ComplexF64,
+)
+    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
+end
+
+function SelfEnergyBlock(
+    name::Symbol,
+    N_λ1::Int,
+    N_λ2::Int,
+    ΣL_nλ::Matrix{ComplexF64},
+    ΣG_nλ::Matrix{ComplexF64},
+    χ_nλ::Matrix{ComplexF64},
+    ξ_an::Matrix{ComplexF64},
+    ::ComplexF64,
+)
+    return SelfEnergyBlock(name, N_λ1, N_λ2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
+end
