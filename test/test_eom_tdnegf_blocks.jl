@@ -195,7 +195,7 @@ end
     p_blocks.Δ_blocks[2] -= 0.1 + 0.0im
     eom_tdnegf_blocks!(du_shifted, u_blocks, p_blocks, 0.0)
 
-    @test !(du_ref ≈ du_shifted rtol = 1e-13 atol = 1e-13)
+    @test !isapprox(du_ref, du_shifted; rtol = 1e-13, atol = 1e-13)
     @test p_blocks.blocks == original_blocks
     @test p_blocks.Δ_blocks ≈ ComplexF64[p_rect.Δ_α[1] + 0.2 + 0.0im, p_rect.Δ_α[2] - 0.1 + 0.0im]
 end
