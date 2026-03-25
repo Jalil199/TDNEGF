@@ -247,7 +247,7 @@ end
 """
     obs_Ixα!(ptr, p_blocks, obs)
 
-Current observable for the heterogeneous block backend.
+Preferred current observable for the heterogeneous block backend.
 
 `obs.Iα` and `obs.Iαx` are indexed by auxiliary block order
 (`p_blocks.blocks`). This may differ from the old rectangular `α` meaning
@@ -271,10 +271,9 @@ unless blocks are configured one-per-physical-lead.
         sx = 0.0; sy = 0.0; sz = 0.0
         for i in 1:p_blocks.obs_N_sites
             r = p_blocks.obs_site_ranges[i]
-            Πloc = @view Πα[r, r]
             tx = 0.0; ty = 0.0; tz = 0.0
             for a in 1:p_blocks.obs_N_loc, b in 1:p_blocks.obs_N_loc
-                Πba = Πloc[b, a]
+                Πba = Πα[r[b], r[a]]
                 tx += real(σx[a, b] * Πba)
                 ty += real(σy[a, b] * Πba)
                 tz += real(σz[a, b] * Πba)
@@ -288,9 +287,17 @@ unless blocks are configured one-per-physical-lead.
     return nothing
 end
 
+"""
+    obs_Ixα!(ptr, p_blocks, p_model, obs)
+
+Compatibility-only overload for block current observables.
+
+Use this only when `p_blocks` was built without observable metadata via
+`ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks)`. The preferred path is
+`obs_Ixα!(ptr, p_blocks, obs)` with `p_blocks` constructed as
+`ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks, p_model)`.
+"""
 @inline function obs_Ixα!(ptr::HeterogeneousAuxPointers, p_blocks::ExperimentalBlockRHSParams, p_model::ModelParamsTDNEGF, obs::ObservablesTDNEGF)
-    # Backward-compatible path using explicit model geometry when block params
-    # were created without observable metadata.
     it = obs.idx
     Π = cal_Π_abα(ptr, p_blocks)
     σx, σy, σz = p_model.σ_x, p_model.σ_y, p_model.σ_z
@@ -308,11 +315,9 @@ end
         sx = 0.0; sy = 0.0; sz = 0.0
         for i in 1:p_model.N_sites
             a0 = (i - 1) * N_loc + 1
-            b0 = i * N_loc
-            Πloc = @view Πα[a0:b0, a0:b0]
             tx = 0.0; ty = 0.0; tz = 0.0
             for a in 1:N_loc, b in 1:N_loc
-                Πba = Πloc[b, a]
+                Πba = Πα[a0 + b - 1, a0 + a - 1]
                 tx += real(σx[a, b] * Πba)
                 ty += real(σy[a, b] * Πba)
                 tz += real(σz[a, b] * Πba)
