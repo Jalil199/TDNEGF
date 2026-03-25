@@ -61,14 +61,13 @@ end
     #### the updated index is moved to evolution loop 
     it = obs.idx#obs.idx = it
     ρ = dv.ρ_ab  # both pointer paths expose `ρ_ab` with the same field name
-    site_ranges = [get_sub(i, p.N_loc) for i in 1:p.N_sites] #sub indexes associate to the spatial-local degrees of freedom 
-    
+    N_loc = p.N_loc
     @inbounds for i in 1:p.N_sites
-        # Note that i 
-        r = site_ranges[i]
-        ρloc = @view ρ[r, r] # view of the local positional subspace of the density matrix
+        a0 = (i - 1) * N_loc + 1
+        b0 = i * N_loc
+        ρloc = @view ρ[a0:b0, a0:b0] # view of the local positional subspace of the density matrix
         s = 0.0
-        @inbounds for a in 1:length(r)
+        @inbounds for a in 1:N_loc
             s += real(ρloc[a,a]) # the density should be a real number 
         end
         obs.n_i[i, it] = s
@@ -83,14 +82,14 @@ end
     ρ  = dv.ρ_ab
     σx, σy, σz = p.σ_x, p.σ_y, p.σ_z
     
-    site_ranges = [get_sub(i, p.N_loc) for i in 1:p.N_sites] 
-    
+    N_loc = p.N_loc
     @inbounds for i in 1:p.N_sites
-        r = site_ranges[i]
-        ρloc = @view ρ[r, r]
+        a0 = (i - 1) * N_loc + 1
+        b0 = i * N_loc
+        ρloc = @view ρ[a0:b0, a0:b0]
 
         sx=0.0; sy=0.0; sz=0.0
-        @inbounds for a in 1:p.N_loc, b in 1:p.N_loc
+        @inbounds for a in 1:N_loc, b in 1:N_loc
             ρba = ρloc[b,a]   # tr(σ ρ) = Σ_ab σ_ab ρ_ba
             sx += real(σx[a,b] * ρba)
             sy += real(σy[a,b] * ρba)
@@ -108,14 +107,14 @@ end
     it = obs.idx
     #ρ  = dv.ρ_ab
     σx, σy, σz = p.σ_x, p.σ_y, p.σ_z
-    site_ranges = [get_sub(i, p.N_loc) for i in 1:p.N_sites] 
-    
+    N_loc = p.N_loc
     @inbounds for i in 1:p.N_sites
-        r = site_ranges[i]
-        ρloc = @view ρ[r, r]
+        a0 = (i - 1) * N_loc + 1
+        b0 = i * N_loc
+        ρloc = @view ρ[a0:b0, a0:b0]
 
         sx=0.0; sy=0.0; sz=0.0
-        @inbounds for a in 1:p.N_loc, b in 1:p.N_loc
+        @inbounds for a in 1:N_loc, b in 1:N_loc
             ρba = ρloc[b,a]   # tr(σ ρ) = Σ_ab σ_ab ρ_ba
             sx += real(σx[a,b] * ρba)
             sy += real(σy[a,b] * ρba)
@@ -213,7 +212,7 @@ end
     Π = cal_Π_abα(dv,p)
     #Π  = p.Π_abα #### Note that this is precalculated inside the eom !
     σx, σy, σz = p.σ_x, p.σ_y, p.σ_z
-    site_ranges = [get_sub(i, p.N_loc) for i in 1:p.N_sites] #sub indexes associate to the spatial-local degrees of freedom 
+    N_loc = p.N_loc
     @inbounds for α in 1:p.Nα
         Πα = @view Π[:, :, α]
         # ---- carga: 2 Re Tr[Πα] ----
@@ -225,10 +224,11 @@ end
         # ---- espín: 2 Re Tr[σloc Πα] por bloques ----
         sx = 0.0; sy = 0.0; sz = 0.0
         @inbounds for i in 1:p.N_sites
-            r = site_ranges[i]
-            Πloc = @view Πα[r, r]
+            a0 = (i - 1) * N_loc + 1
+            b0 = i * N_loc
+            Πloc = @view Πα[a0:b0, a0:b0]
             tx=0.0; ty=0.0; tz=0.0
-            @inbounds for a in 1:p.N_loc, b in 1:p.N_loc
+            @inbounds for a in 1:N_loc, b in 1:N_loc
                 Πba = Πloc[b,a]
                 tx += real(σx[a,b] * Πba)
                 ty += real(σy[a,b] * Πba)
@@ -294,7 +294,7 @@ end
     it = obs.idx
     Π = cal_Π_abα(ptr, p_blocks)
     σx, σy, σz = p_model.σ_x, p_model.σ_y, p_model.σ_z
-    site_ranges = [get_sub(i, p_model.N_loc) for i in 1:p_model.N_sites]
+    N_loc = p_model.N_loc
     Nblocks = length(p_blocks.blocks)
 
     @inbounds for α in 1:Nblocks
@@ -307,10 +307,11 @@ end
 
         sx = 0.0; sy = 0.0; sz = 0.0
         for i in 1:p_model.N_sites
-            r = site_ranges[i]
-            Πloc = @view Πα[r, r]
+            a0 = (i - 1) * N_loc + 1
+            b0 = i * N_loc
+            Πloc = @view Πα[a0:b0, a0:b0]
             tx = 0.0; ty = 0.0; tz = 0.0
-            for a in 1:p_model.N_loc, b in 1:p_model.N_loc
+            for a in 1:N_loc, b in 1:N_loc
                 Πba = Πloc[b, a]
                 tx += real(σx[a, b] * Πba)
                 ty += real(σy[a, b] * Πba)

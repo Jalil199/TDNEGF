@@ -454,6 +454,10 @@ function ExperimentalBlockRHSParams(
     p_obs::ModelParamsTDNEGF,
 )
     p = ExperimentalBlockRHSParams(H_ab, blocks)
+    obs_N_sites = p_obs.N_sites
+    obs_N_loc = p_obs.N_loc
+    obs_N_sites * obs_N_loc == p.dims_ρ_ab[1] || throw(ArgumentError("Observable geometry mismatch: N_sites*N_loc = $(obs_N_sites * obs_N_loc), expected $(p.dims_ρ_ab[1])."))
+    obs_site_ranges = [get_sub(i, obs_N_loc) for i in 1:obs_N_sites]
     return ExperimentalBlockRHSParams(
         H_ab = p.H_ab,
         dims_ρ_ab = p.dims_ρ_ab,
@@ -474,12 +478,12 @@ function ExperimentalBlockRHSParams(
         tmp_λ1p = p.tmp_λ1p,
         tmp_λ2 = p.tmp_λ2,
         tmp_λ2p = p.tmp_λ2p,
-        obs_N_sites = p_obs.N_sites,
-        obs_N_loc = p_obs.N_loc,
+        obs_N_sites = obs_N_sites,
+        obs_N_loc = obs_N_loc,
         obs_σ_x = p_obs.σ_x,
         obs_σ_y = p_obs.σ_y,
         obs_σ_z = p_obs.σ_z,
-        obs_site_ranges = [((i - 1) * p_obs.N_loc + 1):(i * p_obs.N_loc) for i in 1:p_obs.N_sites],
+        obs_site_ranges = obs_site_ranges,
     )
 end
 
