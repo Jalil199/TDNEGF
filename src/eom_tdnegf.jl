@@ -487,6 +487,8 @@ function ExperimentalBlockRHSParams(
     Δ_blocks::Vector{ComplexF64},
     p_obs::ModelParamsTDNEGF,
 )
+    # Preferred constructor for block observables: it stores geometry and
+    # Pauli matrices required by obs_Ixα!(ptr, p_blocks, obs).
     p = ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks)
     obs_N_sites = p_obs.N_sites
     obs_N_loc = p_obs.N_loc

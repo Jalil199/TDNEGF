@@ -46,7 +46,7 @@ For the block path, index `α` follows `p_blocks.blocks` order and is therefore
 block-structured (it only equals physical-lead indexing when blocks are defined
 one-per-lead). The minimum geometry/spin metadata is stored directly in
 `ExperimentalBlockRHSParams` when it is constructed with
-`ExperimentalBlockRHSParams(H_ab, blocks, p_model)`.
+`ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks, p_model)`.
 
 ## Data-flow placement
 Typical usage after propagation:
@@ -57,7 +57,9 @@ Typical usage after propagation:
    - local observables: `obs_n_i!`, `obs_σ_i!` with either pointer type,
    - current observables:
      - legacy: `obs_Ixα!(dv, p, obs)`,
-     - block: `obs_Ixα!(ptr, p_blocks, obs)` if `p_blocks` was built with
-       model metadata, or fallback `obs_Ixα!(ptr, p_blocks, p, obs)`.
+     - preferred block path: `obs_Ixα!(ptr, p_blocks, obs)` with
+       `p_blocks = ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks, p_model)`,
+     - compatibility-only fallback: `obs_Ixα!(ptr, p_blocks, p, obs)` for
+       `p_blocks` created without observable metadata.
 
 This post-processing flow is demonstrated in the main square-lattice example.
