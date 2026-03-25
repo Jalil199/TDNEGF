@@ -4,6 +4,16 @@ TDNEGF-Hybrid is a Julia package for time-dependent quantum transport in open sy
 In practice, you evolve a one-time TDNEGF ODE system for the reduced density matrix
 and auxiliary variables, then post-process observables from that trajectory.
 
+## Features
+
+- Two solver backends in one package:
+  - block-based heterogeneous auxiliary backend (`eom_tdnegf_blocks!`) for current/new workflows,
+  - legacy rectangular auxiliary backend (`eom_tdnegf!`) for compatibility and cross-checks.
+- Pole-based embedding self-energy workflow for square-lattice lead setups.
+- In-place ODE propagation with DifferentialEquations.jl.
+- Observable utilities for charge density, electronic spin density, and lead/block charge-spin currents.
+- Ready-to-run examples and notebooks demonstrating the current block-based workflow.
+
 ## Current architecture (post block refactor)
 
 At the moment, the repository ships with **two auxiliary-solver backends**:
@@ -48,6 +58,24 @@ Think of the block backend as a clean split between:
 
 This split makes sweeps and time-dependent updates simpler: you can modify
 dynamic terms without rebuilding block definitions.
+
+## Physical quantities and formalism (concise)
+
+To keep the physics visible (not just the software API), the propagated state
+follows the same TDNEGF one-time structure in both backends:
+
+- `ρ_ab(t)`: reduced single-particle density matrix in the device basis.
+- `Ψ` and `Ω`: auxiliary objects from the pole expansion of embedding
+  self-energies, which close the equations as a first-order ODE system.
+
+At a high level, the RHS combines:
+- coherent device evolution through `H_ab`,
+- open-boundary/lead effects through self-energy coefficients
+  (`ΣL`, `ΣG`, `χ`, `ξ`),
+- and bias-dependent shifts through `Δ` (legacy `Δ_α`, block `Δ_blocks`).
+
+In short: **same physical TDNEGF formalism, different auxiliary data layout**
+(rectangular legacy vs heterogeneous blocks).
 
 ## Observables and post-processing status
 
