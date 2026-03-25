@@ -4,7 +4,7 @@ using Random
 
 @testset "Observable equivalence between rectangular and block pointers" begin
     p_rect, p_blocks, u_rect, u_blocks = build_equivalent_rhs_setup_multiblock()
-    p_blocks_obs = ExperimentalBlockRHSParams(copy(p_rect.H_ab), p_blocks.blocks, p_rect)
+    p_blocks_obs = ExperimentalBlockRHSParams(copy(p_rect.H_ab), p_blocks.blocks, copy(p_blocks.Δ_blocks), p_rect)
 
     dv_rect = TDNEGF.pointer(u_rect, p_rect)
     dv_blocks = pointer_blocks(u_blocks, p_blocks_obs.dims_ρ_ab, p_blocks_obs.aux_layout)

@@ -63,7 +63,6 @@ function build_equivalent_rhs_setup_multiblock()
         copy(p_rect.Σᴳ_nλα[:, :, 1]),
         copy(p_rect.χ_nλα[:, :, 1]),
         copy(p_rect.ξ_anα[:, :, 1]),
-        p_rect.Δ_α[1],
     )
     block2 = SelfEnergyBlock(
         :right,
@@ -74,9 +73,8 @@ function build_equivalent_rhs_setup_multiblock()
         copy(p_rect.Σᴳ_nλα[:, :, 2]),
         copy(p_rect.χ_nλα[:, :, 2]),
         copy(p_rect.ξ_anα[:, :, 2]),
-        p_rect.Δ_α[2],
     )
-    p_blocks = ExperimentalBlockRHSParams(copy(p_rect.H_ab), [block1, block2])
+    p_blocks = ExperimentalBlockRHSParams(copy(p_rect.H_ab), [block1, block2], copy(p_rect.Δ_α))
 
     Random.seed!(17)
     u_rect = randn(ComplexF64, p_rect.size_u)
@@ -183,6 +181,23 @@ end
     copy_blocks_to_rect!(u_blocks_t_as_rect, u_blocks_t, p_rect, p_blocks)
 
     @test u_rect_t ≈ u_blocks_t_as_rect rtol = 1e-11 atol = 1e-11
+end
+
+@testset "Δ_blocks updates drive block dynamics without rebuilding blocks" begin
+    p_rect, p_blocks, _, u_blocks = build_equivalent_rhs_setup_multiblock()
+    du_ref = similar(u_blocks)
+    du_shifted = similar(u_blocks)
+
+    eom_tdnegf_blocks!(du_ref, u_blocks, p_blocks, 0.0)
+
+    original_blocks = copy(p_blocks.blocks)
+    p_blocks.Δ_blocks[1] += 0.2 + 0.0im
+    p_blocks.Δ_blocks[2] -= 0.1 + 0.0im
+    eom_tdnegf_blocks!(du_shifted, u_blocks, p_blocks, 0.0)
+
+    @test !isapprox(du_ref, du_shifted; rtol = 1e-13, atol = 1e-13)
+    @test p_blocks.blocks == original_blocks
+    @test p_blocks.Δ_blocks ≈ ComplexF64[p_rect.Δ_α[1] + 0.2 + 0.0im, p_rect.Δ_α[2] - 0.1 + 0.0im]
 end
 
 # Lightweight local performance check (optional):
