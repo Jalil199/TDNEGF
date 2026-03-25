@@ -14,7 +14,7 @@ and auxiliary variables, then post-process observables from that trajectory.
 - Observable utilities for charge density, electronic spin density, and lead/block charge-spin currents.
 - Ready-to-run examples and notebooks demonstrating the current block-based workflow.
 
-## Current architecture (post block refactor)
+## Current architecture
 
 At the moment, the repository ships with **two auxiliary-solver backends**:
 
@@ -32,13 +32,7 @@ At the moment, the repository ships with **two auxiliary-solver backends**:
 > TL;DR: if you are starting now, use the block backend first.
 > The type name still includes `Experimental...`, but this is the workflow actively demonstrated in the repo.
 
-## Block backend design in one page
-
-Think of the block backend as a clean split between:
-- **what a block is** (static structure), and
-- **what changes during a run** (dynamic problem state/parameters).
-
-### Core roles
+## Core roles
 
 - **`SelfEnergyBlock`**
   - Stores **static structural block data** for one auxiliary block: block sizes/splits (`Nc`, `N_λ1`, `N_λ2`) and static tensors (`ΣL_nλ`, `ΣG_nλ`, `χ_nλ`, `ξ_an`).
@@ -51,7 +45,7 @@ Think of the block backend as a clean split between:
   - In-place ODE RHS for the block backend.
   - Uses block/pair layout metadata to evolve `ρ_ab` plus heterogeneous `Ψ`/`Ω` sectors without converting to the old rectangular auxiliary layout.
 
-### Design split (important)
+## Design split 
 
 - Put **structural/static** block metadata in `SelfEnergyBlock`.
 - Put **dynamic, problem-level** quantities (`H_ab`, `Δ_blocks`, and runtime caches) in `ExperimentalBlockRHSParams`.
@@ -59,9 +53,9 @@ Think of the block backend as a clean split between:
 This split makes sweeps and time-dependent updates simpler: you can modify
 dynamic terms without rebuilding block definitions.
 
-## Physical quantities and formalism (concise)
+## Physical quantities and formalism 
 
-To keep the physics visible (not just the software API), the propagated state
+The propagated state
 follows the same TDNEGF one-time structure in both backends:
 
 - `ρ_ab(t)`: reduced single-particle density matrix in the device basis.
@@ -69,7 +63,7 @@ follows the same TDNEGF one-time structure in both backends:
   self-energies, which close the equations as a first-order ODE system.
 
 At a high level, the RHS combines:
-- coherent device evolution through `H_ab`,
+- evolution through `H_ab`,
 - open-boundary/lead effects through self-energy coefficients
   (`ΣL`, `ΣG`, `χ`, `ξ`),
 - and bias-dependent shifts through `Δ` (legacy `Δ_α`, block `Δ_blocks`).
@@ -110,7 +104,7 @@ using Pkg
 Pkg.develop(path="/path/to/TDNEGF")
 ```
 
-## Quick start (improved)
+## Quick start 
 
 If you are new to the repo, start with the **block backend** workflow:
 
