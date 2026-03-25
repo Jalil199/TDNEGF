@@ -1,5 +1,15 @@
-### Static container for one self-energy block used by the current ξ-based auxiliary backend.
-### This is not yet a fully general representation of arbitrary self-energies.
+"""
+    SelfEnergyBlock
+
+Static metadata + coefficient tensors for one block in the experimental
+block-based auxiliary path.
+
+Shape conventions (all per block):
+- `ΣL_nλ`, `ΣG_nλ`, `χ_nλ`: `(Nc, N_λ)`
+- `ξ_an`: `(Ns, Nc)` where `Ns` is the system Hilbert-space size
+- `N_λ = N_λ1 + N_λ2` splits poles exactly as in the legacy solver's
+  `(λ1, λ2)` sectors (`Ω11`, `Ω12`, `Ω21`).
+"""
 struct SelfEnergyBlock
     name::Symbol
     Nc::Int

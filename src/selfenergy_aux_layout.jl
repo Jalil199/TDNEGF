@@ -1,6 +1,11 @@
 """
-Lightweight local layout for one heterogeneous self-energy auxiliary block.
-Stores only Ψ for the source block.
+    SelfEnergyAuxBlockLayout
+
+Linearization metadata for one block's `Ψ` sector inside the flattened auxiliary
+state vector (excluding the leading global `ρ_ab` segment).
+
+For block `i`, `Ψ_anλ` has shape `(Ns, Nc_i, N_λ_i)` and contributes
+`size_Ψ = Ns * Nc_i * N_λ_i` contiguous entries.
 """
 Base.@kwdef struct SelfEnergyAuxBlockLayout
     name::Symbol
@@ -39,7 +44,15 @@ end
 end
 
 """
-Layout for Ω sectors that couple one source block `i` to one target block `j`.
+    SelfEnergyAuxPairLayout
+
+Linearization metadata for the ordered block pair `(i, j)` Ω sectors:
+- `Ω11`: `(Nc_i, N_λ1_i, Nc_j, N_λ1_j)`
+- `Ω12`: `(Nc_i, N_λ1_i, Nc_j, N_λ2_j)`
+- `Ω21`: `(Nc_i, N_λ2_i, Nc_j, N_λ1_j)`
+
+This mirrors the legacy monolithic ordering, but with per-block heterogeneous
+sizes.
 """
 Base.@kwdef struct SelfEnergyAuxPairLayout
     source::Int
@@ -112,16 +125,15 @@ end
     )
 end
 
-Base.@kwdef struct SelfEnergyAuxLayout
-    block_layouts::Vector{SelfEnergyAuxBlockLayout}
-    pair_layouts::Matrix{SelfEnergyAuxPairLayout}
-    total_size::Int
-end
-
 """
     build_selfenergy_aux_layout(blocks)
 
-Build per-block Ψ layouts and pairwise Ω layouts. Returns a `SelfEnergyAuxLayout`.
+Build the block-based auxiliary linearization (without `ρ_ab`):
+1. all block `Ψ` segments in block order,
+2. then all ordered-pair Ω segments in `(i, j)` nested-loop order.
+
+`total_size` is the number of auxiliary entries after `ρ_ab` in the flattened
+state vector used by `pointer_blocks`.
 """
 function build_selfenergy_aux_layout(blocks::AbstractVector{SelfEnergyBlock})
     nblocks = length(blocks)
@@ -177,6 +189,21 @@ Base.@kwdef struct SelfEnergyAuxPairPointers{
 end
 
 """
+    SelfEnergyAuxLayout
+
+Global layout object for the experimental block-based path.
+
+It stores per-block and per-pair ranges in the auxiliary tail of the flattened
+state. The full ODE state is `[vec(ρ_ab); aux_tail]`, so these ranges are
+shifted by `length(vec(ρ_ab))` when creating runtime views.
+"""
+Base.@kwdef struct SelfEnergyAuxLayout
+    block_layouts::Vector{SelfEnergyAuxBlockLayout}
+    pair_layouts::Matrix{SelfEnergyAuxPairLayout}
+    total_size::Int
+end
+
+"""
 Pointer-like views for the heterogeneous auxiliary-state layout.
 """
 Base.@kwdef struct HeterogeneousAuxPointers{
@@ -196,6 +223,9 @@ Return zero-copy views into a flattened vector with:
 - one global `ρ_ab` view,
 - one view per block for `Ψ`,
 - one view per ordered block pair `(i,j)` for `Ω11`, `Ω12`, `Ω21`.
+
+The returned views follow the same logical ordering as the legacy pointer
+layout, but with heterogeneous block sizes.
 """
 @inline function pointer_blocks(
     vec::Vector{ComplexF64},
@@ -206,30 +236,32 @@ Return zero-copy views into a flattened vector with:
     required_size = size_ρ_ab + layout.total_size
     length(vec) < required_size && throw(ArgumentError("vector length $(length(vec)) is smaller than required size $(required_size)"))
 
+    # Leading segment is always the global density matrix.
     ρ_ab = reshape(view(vec, 1:size_ρ_ab), dims_ρ_ab)
 
     nblocks = length(layout.block_layouts)
     block_views = Vector{SelfEnergyAuxBlockPointers}(undef, nblocks)
 
-    next_idx = size_ρ_ab + 1
+    base = size_ρ_ab
+    max_end = base
     for i in 1:nblocks
         bl = layout.block_layouts[i]
-        range_Ψ = next_idx:(next_idx + bl.size_Ψ - 1)
-        next_idx = last(range_Ψ) + 1
-
+        # Layout ranges are defined in the auxiliary tail; shift by `base` to
+        # map them onto full-state indices [vec(ρ_ab); aux_tail].
+        range_Ψ = (first(bl.range_Ψ) + base):(last(bl.range_Ψ) + base)
         Ψ_anλ = reshape(view(vec, range_Ψ), (bl.Ns, bl.Nc, bl.N_λ))
         block_views[i] = SelfEnergyAuxBlockPointers(name = bl.name, Ψ_anλ = Ψ_anλ, range_Ψ = range_Ψ)
+        max_end = max(max_end, last(range_Ψ))
     end
 
     pair_views = Matrix{SelfEnergyAuxPairPointers}(undef, nblocks, nblocks)
     for i in 1:nblocks
         for j in 1:nblocks
             pl = layout.pair_layouts[i, j]
-
-            range_Ω11 = next_idx:(next_idx + pl.size_Ω11 - 1)
-            range_Ω12 = (last(range_Ω11) + 1):(last(range_Ω11) + pl.size_Ω12)
-            range_Ω21 = (last(range_Ω12) + 1):(last(range_Ω12) + pl.size_Ω21)
-            next_idx = last(range_Ω21) + 1
+            # Ordered pair (i,j) uses three Ω sectors with heterogeneous shapes.
+            range_Ω11 = (first(pl.range_Ω11) + base):(last(pl.range_Ω11) + base)
+            range_Ω12 = (first(pl.range_Ω12) + base):(last(pl.range_Ω12) + base)
+            range_Ω21 = (first(pl.range_Ω21) + base):(last(pl.range_Ω21) + base)
 
             Ω11 = reshape(view(vec, range_Ω11), (pl.Nc_i, pl.N_λ1_i, pl.Nc_j, pl.N_λ1_j))
             Ω12 = reshape(view(vec, range_Ω12), (pl.Nc_i, pl.N_λ1_i, pl.Nc_j, pl.N_λ2_j))
@@ -247,10 +279,13 @@ Return zero-copy views into a flattened vector with:
                 range_Ω12 = range_Ω12,
                 range_Ω21 = range_Ω21,
             )
+            max_end = max(max_end, last(range_Ω21))
         end
     end
 
-    next_idx - 1 == required_size || throw(ArgumentError("layout sizes are inconsistent with flattened vector size"))
+    # Keep a global consistency guard so layout construction remains reusable and
+    # future extensions cannot silently drift from the flattened storage contract.
+    max_end == required_size || throw(ArgumentError("layout sizes are inconsistent with flattened vector size"))
 
     return HeterogeneousAuxPointers(ρ_ab = ρ_ab, blocks = block_views, Ω_pairs = pair_views)
 end
