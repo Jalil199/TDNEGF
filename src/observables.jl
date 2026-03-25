@@ -254,7 +254,7 @@ Current observable for the heterogeneous block backend.
 unless blocks are configured one-per-physical-lead.
 """
 @inline function obs_Ixα!(ptr::HeterogeneousAuxPointers, p_blocks::ExperimentalBlockRHSParams, obs::ObservablesTDNEGF)
-    p_blocks.obs_N_sites > 0 || throw(ArgumentError("ExperimentalBlockRHSParams is missing observable geometry. Build it with ExperimentalBlockRHSParams(H_ab, blocks, p_model)."))
+    p_blocks.obs_N_sites > 0 || throw(ArgumentError("ExperimentalBlockRHSParams is missing observable geometry. Build it with ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks, p_model)."))
     it = obs.idx
     Π = cal_Π_abα(ptr, p_blocks)
     σx, σy, σz = p_blocks.obs_σ_x, p_blocks.obs_σ_y, p_blocks.obs_σ_z

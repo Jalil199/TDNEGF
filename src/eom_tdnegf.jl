@@ -360,6 +360,7 @@ The block-based path keeps the flattened state layout (`aux_layout`) separate
 from numerical caches:
 - per-block reductions/work arrays (`Ψ_an`, `HΨ`, `ρξ`),
 - conjugated/self-energy coefficients (`χ′`, `Σᴸ′`, `Γ`, `Γ′`),
+- dynamic problem-level ingredients (`H_ab`, `Δ_blocks`),
 - small temporary vectors used inside Ω updates (`tmp_Ψ_vec`, `tmp_λ*`).
 
 These caches mirror repeated operations in the legacy solver while avoiding
@@ -367,6 +368,9 @@ per-RHS allocations.
 """
 Base.@kwdef struct ExperimentalBlockRHSParams
     H_ab::Matrix{ComplexF64}
+    # Dynamic block energy shifts (Δ) used in Ψ/Ω RHS terms.
+    # Kept at problem level so scans can update Δ without rebuilding blocks.
+    Δ_blocks::Vector{ComplexF64}
     dims_ρ_ab::NTuple{2,Int}
     size_ρ_ab::Int
     aux_layout::SelfEnergyAuxLayout
@@ -398,9 +402,10 @@ Base.@kwdef struct ExperimentalBlockRHSParams
     obs_site_ranges::Vector{UnitRange{Int}}
 end
 
-function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{SelfEnergyBlock})
+function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{SelfEnergyBlock}, Δ_blocks::Vector{ComplexF64})
     Ns = size(H_ab, 1)
     size(H_ab, 2) == Ns || throw(ArgumentError("H_ab must be square"))
+    length(Δ_blocks) == length(blocks) || throw(ArgumentError("length(Δ_blocks) must match length(blocks)"))
     dims_ρ_ab = (Ns, Ns)
     size_ρ_ab = Ns * Ns
     aux_layout = build_selfenergy_aux_layout(blocks)
@@ -443,6 +448,7 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
 
     return ExperimentalBlockRHSParams(
         H_ab = H_ab,
+        Δ_blocks = Δ_blocks,
         dims_ρ_ab = dims_ρ_ab,
         size_ρ_ab = size_ρ_ab,
         aux_layout = aux_layout,
@@ -478,15 +484,17 @@ end
 function ExperimentalBlockRHSParams(
     H_ab::Matrix{ComplexF64},
     blocks::Vector{SelfEnergyBlock},
+    Δ_blocks::Vector{ComplexF64},
     p_obs::ModelParamsTDNEGF,
 )
-    p = ExperimentalBlockRHSParams(H_ab, blocks)
+    p = ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks)
     obs_N_sites = p_obs.N_sites
     obs_N_loc = p_obs.N_loc
     obs_N_sites * obs_N_loc == p.dims_ρ_ab[1] || throw(ArgumentError("Observable geometry mismatch: N_sites*N_loc = $(obs_N_sites * obs_N_loc), expected $(p.dims_ρ_ab[1])."))
     obs_site_ranges = [get_sub(i, obs_N_loc) for i in 1:obs_N_sites]
     return ExperimentalBlockRHSParams(
         H_ab = p.H_ab,
+        Δ_blocks = p.Δ_blocks,
         dims_ρ_ab = p.dims_ρ_ab,
         size_ρ_ab = p.size_ρ_ab,
         aux_layout = p.aux_layout,
@@ -520,6 +528,35 @@ function ExperimentalBlockRHSParams(
 end
 
 """
+    update_H_e!(p::ExperimentalBlockRHSParams, H0, site_ranges, S, j_sd; Ny, σx, σy, σz)
+
+In-place Hamiltonian update for the block backend. This mirrors the
+`ModelParamsTDNEGF` update rule while keeping `H_ab` as a dynamic
+problem-level object alongside `Δ_blocks`.
+"""
+@inline function update_H_e!(p::ExperimentalBlockRHSParams, H0::Matrix{ComplexF64},
+                            site_ranges::Vector{UnitRange{Int64}},
+                            S::Matrix{SVector{3,Float64}},
+                            j_sd::Float64;
+                            Ny::Int,
+                            σx::SMatrix{2,2,Float64,4}=SMatrix{2,2,Float64,4}(0.0, 1.0, 1.0, 0.0),
+                            σy::SMatrix{2,2,ComplexF64,4}=SMatrix{2,2,ComplexF64,4}(0.0 + 0.0im, -1im, 1im, 0.0 + 0.0im),
+                            σz::SMatrix{2,2,Float64,4}=SMatrix{2,2,Float64,4}(1.0, 0.0, 0.0, -1.0))
+    H = p.H_ab
+    @assert size(H, 1) == size(H0, 1) == size(H0, 2) "H/H0 dimensions must match"
+    @inbounds for l in 1:length(site_ranges)
+        a, b = ij_from_linear(l, Ny)
+        r = site_ranges[l]
+        Sx = S[a,b][1]; Sy = S[a,b][2]; Sz = S[a,b][3]
+        H[r[1], r[1]] = H0[r[1], r[1]] - j_sd*(Sx*σx[1,1] + Sy*σy[1,1] + Sz*σz[1,1])
+        H[r[1], r[2]] = H0[r[1], r[2]] - j_sd*(Sx*σx[1,2] + Sy*σy[1,2] + Sz*σz[1,2])
+        H[r[2], r[1]] = H0[r[2], r[1]] - j_sd*(Sx*σx[2,1] + Sy*σy[2,1] + Sz*σz[2,1])
+        H[r[2], r[2]] = H0[r[2], r[2]] - j_sd*(Sx*σx[2,2] + Sy*σy[2,2] + Sz*σz[2,2])
+    end
+    return nothing
+end
+
+"""
     eom_tdnegf_blocks!(du, u, p, t)
 
 In-place RHS for the experimental heterogeneous block-based auxiliary solver.
@@ -539,6 +576,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
     @inbounds for i in eachindex(p.blocks)
         block_i = p.blocks[i]
+        Δ_i = p.Δ_blocks[i]
         Nc_i = block_i.Nc
         N_λ1_i = block_i.N_λ1
         N_λ2_i = block_i.N_λ2
@@ -575,7 +613,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                 Σᴸ′ = Σᴸ′_i[n, λ]
                 Γ′ = Γ′_i[n, λ]
 
-                coef_χΨ = 1im * (χ′ + block_i.Δ)
+                coef_χΨ = 1im * (χ′ + Δ_i)
                 coef_Σξ = 1im * Σᴸ′
                 coef_Γρξ = -Γ′
 
@@ -660,6 +698,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
     @inbounds for i in eachindex(p.blocks)
         block_i = p.blocks[i]
+        Δ_i = p.Δ_blocks[i]
         Nc_i = block_i.Nc
         N_λ1_i = block_i.N_λ1
         N_λ2_i = block_i.N_λ2
@@ -672,6 +711,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
         for j in eachindex(p.blocks)
             block_j = p.blocks[j]
+            Δ_j = p.Δ_blocks[j]
             Nc_j = block_j.Nc
             N_λ1_j = block_j.N_λ1
             N_λ2_j = block_j.N_λ2
@@ -716,7 +756,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                             Γ_j_npl1p = Γ_j[n_p, λ1_p]
                             term1 = -1im * Γ_j_npl1p * dot1[λ1]
                             term2 = -1im * Γ′_nλ1 * dot2[λ1_p]
-                            pref3 = -1im * (χ_j_npl1p + block_j.Δ - χ′_nλ1 - block_i.Δ)
+                            pref3 = -1im * (χ_j_npl1p + Δ_j - χ′_nλ1 - Δ_i)
                             dΩ11_ij[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * Ω11_ij[n, λ1, n_p, λ1_p]
                         end
                     end
@@ -730,7 +770,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                             Γ_j_npl2p = Γ_j[n_p, λglob_2p]
                             term1 = -1im * Γ_j_npl2p * dot1[λ1]
                             term2 = -1im * Γ′_nλ1 * dot4[λ2_p]
-                            pref3 = -1im * (χ_j_npl2p + block_j.Δ - χ′_nλ1 - block_i.Δ)
+                            pref3 = -1im * (χ_j_npl2p + Δ_j - χ′_nλ1 - Δ_i)
                             dΩ12_ij[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * Ω12_ij[n, λ1, n_p, λ2_p]
                         end
                     end
@@ -744,7 +784,7 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
                             Γ_j_npl1p = Γ_j[n_p, λ1_p]
                             term1 = -1im * Γ_j_npl1p * dot3[λ2]
                             term2 = -1im * Γ′_nλ2 * dot2[λ1_p]
-                            pref3 = -1im * (χ_j_npl1p + block_j.Δ - χ′_nλ2 - block_i.Δ)
+                            pref3 = -1im * (χ_j_npl1p + Δ_j - χ′_nλ2 - Δ_i)
                             dΩ21_ij[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * Ω21_ij[n, λ2, n_p, λ1_p]
                         end
                     end

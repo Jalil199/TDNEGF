@@ -47,8 +47,9 @@ end
 function init_block_path(common)
     p = ModelParamsTDNEGF(; Nx = 2, Ny = 1, Nσ = 2, N_orb = 1, Nα = 2, N_λ1 = 49, N_λ2 = 2)
 
-    left_block = SelfEnergyBlock(:left, p.Nc, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anL, 0.5 + 0.0im)
-    right_block = SelfEnergyBlock(:right, p.Nc, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anR, -0.5 + 0.0im)
+    left_block = SelfEnergyBlock(:left, p.Nc, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anL)
+    right_block = SelfEnergyBlock(:right, p.Nc, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anR)
+    Δ_blocks = ComplexF64[0.5 + 0.0im, -0.5 + 0.0im]
 
     p.H_ab .= common.H_ab
     p.H0_ab .= common.H_ab
@@ -58,7 +59,7 @@ function init_block_path(common)
         p.Σᴳ_nλα[:, :, α] .= block.ΣG_nλ
         p.χ_nλα[:, :, α] .= block.χ_nλ
         p.ξ_anα[:, :, α] .= block.ξ_an
-        p.Δ_α[α] = block.Δ
+        p.Δ_α[α] = Δ_blocks[α]
     end
 
     p.Γ_nλα .= 1im .* (p.Σᴳ_nλα .- p.Σᴸ_nλα)
@@ -77,8 +78,8 @@ end
     χ_nλ = zeros(ComplexF64, Nc, 3)
     ξ_an = zeros(ComplexF64, Ns, Nc)
 
-    @test_throws ArgumentError SelfEnergyBlock(:bad, Nc, 2, 0, 3, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, 0.0 + 0.0im)
-    @test_throws ArgumentError SelfEnergyBlock(:bad, 2, 2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, 0.0 + 0.0im)
+    @test_throws ArgumentError SelfEnergyBlock(:bad, Nc, 2, 0, 3, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
+    @test_throws ArgumentError SelfEnergyBlock(:bad, 2, 2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an)
 end
 
 @testset "SelfEnergyBlock initialization matches manual path" begin

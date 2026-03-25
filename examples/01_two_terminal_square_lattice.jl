@@ -7,7 +7,8 @@ This example now uses the heterogeneous block-based TDNEGF backend as the
 primary workflow:
   * Build the same square-lattice Hamiltonian H_ab for a finite Nx × Ny system.
   * Build lead ingredients (Σᴸ/Σᴳ/χ and ξ) as before.
-  * Assemble explicit SelfEnergyBlock objects (left/right).
+  * Assemble explicit SelfEnergyBlock objects (left/right) with static data.
+  * Keep bias shifts in `Δ_blocks` so they are easy to scan/update in-place.
   * Construct ExperimentalBlockRHSParams and solve eom_tdnegf_blocks!.
   * Compute observables directly from pointer_blocks(...) without converting
     states back to the legacy rectangular auxiliary layout.
@@ -51,16 +52,17 @@ function init_params_blocks(;Nx::Int=50, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
                        xcol = 1, y_coup = 1:p_model.Ny)
 
     left_block = SelfEnergyBlock(:left, p_model.Nc, p_model.N_λ1, p_model.N_λ2,
-                                 Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL, 0.5 + 0.0im)
+                                 Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL)
     right_block = SelfEnergyBlock(:right, p_model.Nc, p_model.N_λ1, p_model.N_λ2,
-                                  Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR, -0.5 + 0.0im)
+                                  Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR)
     blocks = [left_block, right_block]
+    Δ_blocks = ComplexF64[0.5 + 0.0im, -0.5 + 0.0im]
 
     p_model.H_ab .= H_ab
     p_model.H0_ab .= H_ab
 
     # Block RHS params are the main backend object for solve + current observables.
-    p_blocks = ExperimentalBlockRHSParams(p_model.H_ab, blocks, p_model)
+    p_blocks = ExperimentalBlockRHSParams(p_model.H_ab, blocks, Δ_blocks, p_model)
 
     u0 = zeros(ComplexF64, p_blocks.dims_ρ_ab[1]^2 + p_blocks.aux_layout.total_size)
     return p_model, p_blocks, u0
