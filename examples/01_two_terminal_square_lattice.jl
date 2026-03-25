@@ -89,26 +89,26 @@ using JLD2
 @save "./examples/data/two_terminal_square_lattice_observables.jl2" obs
 println("The results has been saved")
 #### Plot results 
-# using PyPlot 
-# plt.rc("axes", linewidth=1)  # Set the linewidth of the plot axes
-# plt.rc("text", usetex=true)  # Enable LaTeX rendering of text
-# fs = 25
+ using PyPlot 
+ plt.rc("axes", linewidth=1)  # Set the linewidth of the plot axes
+ plt.rc("text", usetex=true)  # Enable LaTeX rendering of text
+ fs = 25
 # ### Plot the charge denisty
 # ###------------------------------------------------------
-# fig,axs =  plt.subplots(1,1)
-# site = 1
-# sites = 1:2:12#range(1,12)
-# for site in sites
-#     axs.plot(obs.t,obs.n_i[site,:],label= "site=$(site)")#,alpha =1-0.2*i ) ### Charge bound current
-# end
-# axs.set_ylabel(raw"$\langle\mathrm{\hat{n}_i}\rangle$", fontsize = fs)
-# axs.set_xlabel(raw"$\mathrm{Time\ (\hbar/\gamma)}$",fontsize = fs)
-# axs.tick_params(axis="both", which="both", labelsize=fs,direction="in", length=6,width=1)
-# axs.ticklabel_format(axis="y", style="sci", scilimits=(-1,2), useMathText=true)
-# axs.yaxis.offsetText.set_fontsize(fs)
-# plt.legend(frameon = false, fontsize = fs-10, loc= (0.7,  0.1))
-# plt.tight_layout()
-# plt.show()
+ fig,axs =  plt.subplots(1,1)
+ site = 1
+ sites = 1:2:12#range(1,12)
+ for site in sites
+     axs.plot(obs.t,obs.n_i[site,:],label= "site=$(site)")#,alpha =1-0.2*i ) ### Charge bound current
+ end
+ axs.set_ylabel(raw"$\langle\mathrm{\hat{n}_i}\rangle$", fontsize = fs)
+ axs.set_xlabel(raw"$\mathrm{Time\ (\hbar/\gamma)}$",fontsize = fs)
+ axs.tick_params(axis="both", which="both", labelsize=fs,direction="in", length=6,width=1)
+ axs.ticklabel_format(axis="y", style="sci", scilimits=(-1,2), useMathText=true)
+ axs.yaxis.offsetText.set_fontsize(fs)
+ plt.legend(frameon = false, fontsize = fs-10, loc= (0.7,  0.1))
+ plt.tight_layout()
+ plt.show()
 # ###------------------------------------------------------
 
 # ### Plot the charge current 
