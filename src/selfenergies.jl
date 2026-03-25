@@ -24,6 +24,7 @@ struct SelfEnergyBlock
         ξ_an::Matrix{ComplexF64},
         Δ::ComplexF64,
     )
+        Nc > 0 || throw(ArgumentError("Nc must be positive"))
         N_λ1 ≥ 0 || throw(ArgumentError("N_λ1 must be non-negative"))
         N_λ2 ≥ 0 || throw(ArgumentError("N_λ2 must be non-negative"))
         N_λ == N_λ1 + N_λ2 || throw(ArgumentError("N_λ must equal N_λ1 + N_λ2"))
@@ -34,6 +35,28 @@ struct SelfEnergyBlock
 
         return new(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
     end
+end
+
+"""
+    SelfEnergyBlock(name, Nc, N_λ1, N_λ2, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
+
+Primary constructor for auxiliary blocks.
+`N_λ1` and `N_λ2` must be provided explicitly to avoid ambiguous or inconsistent
+metadata in the auxiliary backend.
+"""
+function SelfEnergyBlock(
+    name::Symbol,
+    Nc::Int,
+    N_λ1::Int,
+    N_λ2::Int,
+    ΣL_nλ::Matrix{ComplexF64},
+    ΣG_nλ::Matrix{ComplexF64},
+    χ_nλ::Matrix{ComplexF64},
+    ξ_an::Matrix{ComplexF64},
+    Δ::ComplexF64,
+)
+    _, N_λ = size(ΣL_nλ)
+    return SelfEnergyBlock(name, Nc, N_λ1, N_λ2, N_λ, ΣL_nλ, ΣG_nλ, χ_nλ, ξ_an, Δ)
 end
 
 function SelfEnergyBlock(

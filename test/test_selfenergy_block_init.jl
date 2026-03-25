@@ -47,8 +47,8 @@ end
 function init_block_path(common)
     p = ModelParamsTDNEGF(; Nx = 2, Ny = 1, Nσ = 2, N_orb = 1, Nα = 2, N_λ1 = 49, N_λ2 = 2)
 
-    left_block = SelfEnergyBlock(:left, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anL, 0.5 + 0.0im)
-    right_block = SelfEnergyBlock(:right, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anR, -0.5 + 0.0im)
+    left_block = SelfEnergyBlock(:left, p.Nc, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anL, 0.5 + 0.0im)
+    right_block = SelfEnergyBlock(:right, p.Nc, p.N_λ1, p.N_λ2, common.Σᴸ_nλ, common.Σᴳ_nλ, common.χ_nλ, common.ξ_anR, -0.5 + 0.0im)
 
     p.H_ab .= common.H_ab
     p.H0_ab .= common.H_ab

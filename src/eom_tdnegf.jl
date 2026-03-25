@@ -354,13 +354,17 @@ end
 Base.@kwdef struct ExperimentalBlockRHSParams
     H_ab::Matrix{ComplexF64}
     dims_ρ_ab::NTuple{2,Int}
-    layouts::Vector{SelfEnergyAuxBlockLayout}
+    aux_layout::SelfEnergyAuxLayout
     blocks::Vector{SelfEnergyBlock}
     Hρ::Matrix{ComplexF64}
     Π_ab::Matrix{ComplexF64}
     Ψ_an::Vector{Matrix{ComplexF64}}
     HΨ::Vector{Array{ComplexF64,3}}
     ρξ::Vector{Matrix{ComplexF64}}
+    χ′::Vector{Matrix{ComplexF64}}
+    Σᴸ′::Vector{Matrix{ComplexF64}}
+    Γ::Vector{Matrix{ComplexF64}}
+    Γ′::Vector{Matrix{ComplexF64}}
     tmp_Ψ_vec::Vector{ComplexF64}
     tmp_λ1::Vector{Vector{ComplexF64}}
     tmp_λ1p::Vector{Vector{ComplexF64}}
@@ -372,32 +376,42 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
     Ns = size(H_ab, 1)
     size(H_ab, 2) == Ns || throw(ArgumentError("H_ab must be square"))
     dims_ρ_ab = (Ns, Ns)
-    layouts, _ = build_selfenergy_aux_layout(blocks)
+    aux_layout = build_selfenergy_aux_layout(blocks)
 
     for (i, block) in enumerate(blocks)
-        layout = layouts[i]
+        block_layout = aux_layout.block_layouts[i]
         size(block.ξ_an, 1) == Ns || throw(ArgumentError("block $(block.name) has incompatible ξ_an row-size; expected $Ns, got $(size(block.ξ_an, 1))"))
         block.N_λ == block.N_λ1 + block.N_λ2 || throw(ArgumentError("block $(block.name) has inconsistent λ split: N_λ=$(block.N_λ), N_λ1+N_λ2=$(block.N_λ1 + block.N_λ2)"))
-        layout.Nc == block.Nc || throw(ArgumentError("layout/block Nc mismatch for block $(block.name)"))
-        layout.N_λ1 == block.N_λ1 || throw(ArgumentError("layout/block N_λ1 mismatch for block $(block.name)"))
-        layout.N_λ2 == block.N_λ2 || throw(ArgumentError("layout/block N_λ2 mismatch for block $(block.name)"))
-        layout.N_λ == block.N_λ || throw(ArgumentError("layout/block N_λ mismatch for block $(block.name)"))
+        block_layout.Nc == block.Nc || throw(ArgumentError("layout/block Nc mismatch for block $(block.name)"))
+        block_layout.N_λ1 == block.N_λ1 || throw(ArgumentError("layout/block N_λ1 mismatch for block $(block.name)"))
+        block_layout.N_λ2 == block.N_λ2 || throw(ArgumentError("layout/block N_λ2 mismatch for block $(block.name)"))
+        block_layout.N_λ == block.N_λ || throw(ArgumentError("layout/block N_λ mismatch for block $(block.name)"))
     end
 
     Ψ_an = [zeros(ComplexF64, Ns, b.Nc) for b in blocks]
     HΨ = [zeros(ComplexF64, Ns, b.Nc, b.N_λ) for b in blocks]
     ρξ = [zeros(ComplexF64, Ns, b.Nc) for b in blocks]
 
+    # Keep Γ convention aligned with the legacy path: Γ = 1im * (Σᴳ - Σᴸ).
+    Γ = [1im .* (b.ΣG_nλ .- b.ΣL_nλ) for b in blocks]
+    χ′ = [conj.(b.χ_nλ) for b in blocks]
+    Σᴸ′ = [conj.(b.ΣL_nλ) for b in blocks]
+    Γ′ = [conj.(Γi) for Γi in Γ]
+
     return ExperimentalBlockRHSParams(
         H_ab = H_ab,
         dims_ρ_ab = dims_ρ_ab,
-        layouts = layouts,
+        aux_layout = aux_layout,
         blocks = blocks,
         Hρ = zeros(ComplexF64, Ns, Ns),
         Π_ab = zeros(ComplexF64, Ns, Ns),
         Ψ_an = Ψ_an,
         HΨ = HΨ,
         ρξ = ρξ,
+        χ′ = χ′,
+        Σᴸ′ = Σᴸ′,
+        Γ = Γ,
+        Γ′ = Γ′,
         tmp_Ψ_vec = zeros(ComplexF64, Ns),
         tmp_λ1 = [zeros(ComplexF64, b.N_λ1) for b in blocks],
         tmp_λ1p = [zeros(ComplexF64, b.N_λ1) for b in blocks],
@@ -407,8 +421,8 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
 end
 
 function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::ExperimentalBlockRHSParams, t)
-    ptr = pointer_blocks(u, p.dims_ρ_ab, p.layouts)
-    dptr = pointer_blocks(du, p.dims_ρ_ab, p.layouts)
+    ptr = pointer_blocks(u, p.dims_ρ_ab, p.aux_layout)
+    dptr = pointer_blocks(du, p.dims_ρ_ab, p.aux_layout)
 
     ρ_ab = ptr.ρ_ab
     dρ_ab = dptr.ρ_ab
@@ -416,49 +430,52 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
     fill!(p.Π_ab, 0.0 + 0.0im)
 
     @inbounds for i in eachindex(ptr.blocks)
-        bptr = ptr.blocks[i]
-        dbptr = dptr.blocks[i]
-        block = p.blocks[i]
+        bptr_i = ptr.blocks[i]
+        dbptr_i = dptr.blocks[i]
+        block_i = p.blocks[i]
 
-        Ns = p.layouts[i].Ns
-        Nc = block.Nc
-        N_λ1 = block.N_λ1
-        N_λ2 = block.N_λ2
-        N_λ = block.N_λ
+        Ns = p.aux_layout.block_layouts[i].Ns
+        Nc_i = block_i.Nc
+        N_λ1_i = block_i.N_λ1
+        N_λ2_i = block_i.N_λ2
+        N_λ_i = block_i.N_λ
 
-        Ψ_an = p.Ψ_an[i]
-        HΨ = p.HΨ[i]
-        ρξ = p.ρξ[i]
+        Ψ_an_i = p.Ψ_an[i]
+        HΨ_i = p.HΨ[i]
+        ρξ_i = p.ρξ[i]
+        χ′_i = p.χ′[i]
+        Σᴸ′_i = p.Σᴸ′[i]
+        Γ′_i = p.Γ′[i]
 
-        @inbounds for n in 1:Nc, a in 1:Ns
+        @inbounds for n in 1:Nc_i, a in 1:Ns
             acc = 0.0 + 0.0im
-            @simd for λ in 1:N_λ
-                acc += bptr.Ψ_anλ[a, n, λ]
+            @simd for λ in 1:N_λ_i
+                acc += bptr_i.Ψ_anλ[a, n, λ]
             end
-            Ψ_an[a, n] = acc
+            Ψ_an_i[a, n] = acc
         end
 
-        mul!(reshape(HΨ, Ns, Nc * N_λ), p.H_ab, reshape(bptr.Ψ_anλ, Ns, Nc * N_λ))
-        mul!(ρξ, ρ_ab, block.ξ_an)
+        mul!(reshape(HΨ_i, Ns, Nc_i * N_λ_i), p.H_ab, reshape(bptr_i.Ψ_anλ, Ns, Nc_i * N_λ_i))
+        mul!(ρξ_i, ρ_ab, block_i.ξ_an)
 
-        mul!(p.Π_ab, Ψ_an, transpose(block.ξ_an), 1.0 + 0.0im, 1.0 + 0.0im)
+        mul!(p.Π_ab, Ψ_an_i, transpose(block_i.ξ_an), 1.0 + 0.0im, 1.0 + 0.0im)
 
-        @inbounds for n in 1:Nc
-            ξ_n = @view block.ξ_an[:, n]
-            ρξ_n = @view ρξ[:, n]
+        @inbounds for n in 1:Nc_i
+            ξ_n = @view block_i.ξ_an[:, n]
+            ρξ_n = @view ρξ_i[:, n]
 
-            for λ in 1:N_λ
-                χ′ = conj(block.χ_nλ[n, λ])
-                Σᴸ′ = conj(block.ΣL_nλ[n, λ])
-                # Keep Γ convention aligned with legacy path: Γ = 1im * (Σᴳ - Σᴸ).
-                Γ′ = conj(1im * (block.ΣG_nλ[n, λ] - block.ΣL_nλ[n, λ]))
-                coef_χΨ = 1im * (χ′ + block.Δ)
+            for λ in 1:N_λ_i
+                χ′ = χ′_i[n, λ]
+                Σᴸ′ = Σᴸ′_i[n, λ]
+                Γ′ = Γ′_i[n, λ]
+
+                coef_χΨ = 1im * (χ′ + block_i.Δ)
                 coef_Σξ = 1im * Σᴸ′
                 coef_Γρξ = -Γ′
 
-                dΨ_nλ = @view dbptr.Ψ_anλ[:, n, λ]
-                Ψ_nλ = @view bptr.Ψ_anλ[:, n, λ]
-                HΨ_nλ = @view HΨ[:, n, λ]
+                dΨ_nλ = @view dbptr_i.Ψ_anλ[:, n, λ]
+                Ψ_nλ = @view bptr_i.Ψ_anλ[:, n, λ]
+                HΨ_nλ = @view HΨ_i[:, n, λ]
 
                 @simd for a in 1:Ns
                     dΨ_nλ[a] = -1im * HΨ_nλ[a] + coef_χΨ * Ψ_nλ[a] + coef_Σξ * ξ_n[a] + coef_Γρξ * ρξ_n[a]
@@ -466,114 +483,162 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
             end
         end
 
-        @inbounds for n in 1:Nc
-            ξ_n = @view block.ξ_an[:, n]
-            for λ1 in 1:N_λ1
+        @inbounds for n in 1:Nc_i
+            for λ1 in 1:N_λ1_i
                 fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
 
-                for n_p in 1:Nc
-                    coeff = 0.0 + 0.0im
-                    @simd for λ1_p in 1:N_λ1
-                        coeff += bptr.Ω11[n, λ1, n_p, λ1_p]
-                    end
-                    @simd for λ2_p in 1:N_λ2
-                        coeff += bptr.Ω12[n, λ1, n_p, λ2_p]
-                    end
-                    coeff *= -1im
-                    ξ_np = @view block.ξ_an[:, n_p]
-                    @simd for a in 1:Ns
-                        p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
+                for j in eachindex(ptr.blocks)
+                    pair_ij = ptr.Ω_pairs[i, j]
+                    block_j = p.blocks[j]
+                    Nc_j = block_j.Nc
+                    N_λ1_j = block_j.N_λ1
+                    N_λ2_j = block_j.N_λ2
+
+                    for n_p in 1:Nc_j
+                        coeff = 0.0 + 0.0im
+                        @simd for λ1_p in 1:N_λ1_j
+                            coeff += pair_ij.Ω11[n, λ1, n_p, λ1_p]
+                        end
+                        @simd for λ2_p in 1:N_λ2_j
+                            coeff += pair_ij.Ω12[n, λ1, n_p, λ2_p]
+                        end
+                        coeff *= -1im
+
+                        ξ_np = @view block_j.ξ_an[:, n_p]
+                        @simd for a in 1:Ns
+                            p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
+                        end
                     end
                 end
 
-                dΨ = @view dbptr.Ψ_anλ[:, n, λ1]
+                dΨ = @view dbptr_i.Ψ_anλ[:, n, λ1]
                 @simd for a in 1:Ns
                     dΨ[a] += p.tmp_Ψ_vec[a]
                 end
             end
 
-            for λ2 in 1:N_λ2
-                λ = N_λ1 + λ2
+            for λ2 in 1:N_λ2_i
+                λ = N_λ1_i + λ2
                 fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
-                for n_p in 1:Nc
-                    coeff = 0.0 + 0.0im
-                    @simd for λ1_p in 1:N_λ1
-                        coeff += bptr.Ω21[n, λ2, n_p, λ1_p]
-                    end
-                    coeff *= -1im
-                    ξ_np = @view block.ξ_an[:, n_p]
-                    @simd for a in 1:Ns
-                        p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
+
+                for j in eachindex(ptr.blocks)
+                    pair_ij = ptr.Ω_pairs[i, j]
+                    block_j = p.blocks[j]
+                    Nc_j = block_j.Nc
+                    N_λ1_j = block_j.N_λ1
+
+                    for n_p in 1:Nc_j
+                        coeff = 0.0 + 0.0im
+                        @simd for λ1_p in 1:N_λ1_j
+                            coeff += pair_ij.Ω21[n, λ2, n_p, λ1_p]
+                        end
+                        coeff *= -1im
+
+                        ξ_np = @view block_j.ξ_an[:, n_p]
+                        @simd for a in 1:Ns
+                            p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
+                        end
                     end
                 end
-                dΨ = @view dbptr.Ψ_anλ[:, n, λ]
+
+                dΨ = @view dbptr_i.Ψ_anλ[:, n, λ]
                 @simd for a in 1:Ns
                     dΨ[a] += p.tmp_Ψ_vec[a]
                 end
             end
         end
+    end
+
+    @inbounds for i in eachindex(ptr.blocks)
+        bptr_i = ptr.blocks[i]
+        block_i = p.blocks[i]
+        Nc_i = block_i.Nc
+        N_λ1_i = block_i.N_λ1
+        N_λ2_i = block_i.N_λ2
+        χ′_i = p.χ′[i]
+        Γ′_i = p.Γ′[i]
 
         dot1 = p.tmp_λ1[i]
-        dot2 = p.tmp_λ1p[i]
         dot3 = p.tmp_λ2[i]
-        dot4 = p.tmp_λ2p[i]
 
-        @inbounds for n in 1:Nc
-            ξ_n = @view block.ξ_an[:, n]
-            for n_p in 1:Nc
-                ξ_np = @view block.ξ_an[:, n_p]
+        for j in eachindex(ptr.blocks)
+            bptr_j = ptr.blocks[j]
+            block_j = p.blocks[j]
+            Nc_j = block_j.Nc
+            N_λ1_j = block_j.N_λ1
+            N_λ2_j = block_j.N_λ2
+            χ_j = block_j.χ_nλ
+            Γ_j = p.Γ[j]
 
-                for λ1 in 1:N_λ1
-                    dot1[λ1] = dot(ξ_np, @view bptr.Ψ_anλ[:, n, λ1])
-                end
-                for λ1_p in 1:N_λ1
-                    dot2[λ1_p] = conj(dot(ξ_n, @view bptr.Ψ_anλ[:, n_p, λ1_p]))
-                end
-                for λ2 in 1:N_λ2
-                    dot3[λ2] = dot(ξ_np, @view bptr.Ψ_anλ[:, n, N_λ1 + λ2])
-                end
-                for λ2_p in 1:N_λ2
-                    dot4[λ2_p] = conj(dot(ξ_n, @view bptr.Ψ_anλ[:, n_p, N_λ1 + λ2_p]))
-                end
+            dot2 = p.tmp_λ1p[j]
+            dot4 = p.tmp_λ2p[j]
 
-                for λ1 in 1:N_λ1
-                    χ′_nλ1 = conj(block.χ_nλ[n, λ1])
-                    Γ′_nλ1 = conj(1im * (block.ΣG_nλ[n, λ1] - block.ΣL_nλ[n, λ1]))
-                    for λ1_p in 1:N_λ1
-                        χ_npλ1p = block.χ_nλ[n_p, λ1_p]
-                        Γ_npλ1p = 1im * (block.ΣG_nλ[n_p, λ1_p] - block.ΣL_nλ[n_p, λ1_p])
-                        term1 = -1im * Γ_npλ1p * dot1[λ1]
-                        term2 = -1im * Γ′_nλ1 * dot2[λ1_p]
-                        pref3 = -1im * (χ_npλ1p + block.Δ - χ′_nλ1 - block.Δ)
-                        dbptr.Ω11[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * bptr.Ω11[n, λ1, n_p, λ1_p]
+            pair_ij = ptr.Ω_pairs[i, j]
+            dpair_ij = dptr.Ω_pairs[i, j]
+
+            for n in 1:Nc_i
+                ξ_i_n = @view block_i.ξ_an[:, n]
+                for n_p in 1:Nc_j
+                    ξ_j_np = @view block_j.ξ_an[:, n_p]
+
+                    for λ1 in 1:N_λ1_i
+                        dot1[λ1] = dot(ξ_j_np, @view bptr_i.Ψ_anλ[:, n, λ1])
                     end
-                end
-
-                for λ1 in 1:N_λ1
-                    χ′_nλ1 = conj(block.χ_nλ[n, λ1])
-                    Γ′_nλ1 = conj(1im * (block.ΣG_nλ[n, λ1] - block.ΣL_nλ[n, λ1]))
-                    for λ2_p in 1:N_λ2
-                        λglob_2p = N_λ1 + λ2_p
-                        χ_npλ2p = block.χ_nλ[n_p, λglob_2p]
-                        Γ_npλ2p = 1im * (block.ΣG_nλ[n_p, λglob_2p] - block.ΣL_nλ[n_p, λglob_2p])
-                        term1 = -1im * Γ_npλ2p * dot1[λ1]
-                        term2 = -1im * Γ′_nλ1 * dot4[λ2_p]
-                        pref3 = -1im * (χ_npλ2p + block.Δ - χ′_nλ1 - block.Δ)
-                        dbptr.Ω12[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * bptr.Ω12[n, λ1, n_p, λ2_p]
+                    for λ1_p in 1:N_λ1_j
+                        dot2[λ1_p] = conj(dot(ξ_i_n, @view bptr_j.Ψ_anλ[:, n_p, λ1_p]))
                     end
-                end
+                    for λ2 in 1:N_λ2_i
+                        dot3[λ2] = dot(ξ_j_np, @view bptr_i.Ψ_anλ[:, n, N_λ1_i + λ2])
+                    end
+                    for λ2_p in 1:N_λ2_j
+                        dot4[λ2_p] = conj(dot(ξ_i_n, @view bptr_j.Ψ_anλ[:, n_p, N_λ1_j + λ2_p]))
+                    end
 
-                for λ2 in 1:N_λ2
-                    λglob_2 = N_λ1 + λ2
-                    χ′_nλ2 = conj(block.χ_nλ[n, λglob_2])
-                    Γ′_nλ2 = conj(1im * (block.ΣG_nλ[n, λglob_2] - block.ΣL_nλ[n, λglob_2]))
-                    for λ1_p in 1:N_λ1
-                        χ_npλ1p = block.χ_nλ[n_p, λ1_p]
-                        Γ_npλ1p = 1im * (block.ΣG_nλ[n_p, λ1_p] - block.ΣL_nλ[n_p, λ1_p])
-                        term1 = -1im * Γ_npλ1p * dot3[λ2]
-                        term2 = -1im * Γ′_nλ2 * dot2[λ1_p]
-                        pref3 = -1im * (χ_npλ1p + block.Δ - χ′_nλ2 - block.Δ)
-                        dbptr.Ω21[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * bptr.Ω21[n, λ2, n_p, λ1_p]
+                    for λ1 in 1:N_λ1_i
+                        χ′_nλ1 = χ′_i[n, λ1]
+                        Γ′_nλ1 = Γ′_i[n, λ1]
+                        for λ1_p in 1:N_λ1_j
+                            χ_j_npl1p = χ_j[n_p, λ1_p]
+                            Γ_j_npl1p = Γ_j[n_p, λ1_p]
+
+                            term1 = -1im * Γ_j_npl1p * dot1[λ1]
+                            term2 = -1im * Γ′_nλ1 * dot2[λ1_p]
+                            pref3 = -1im * (χ_j_npl1p + block_j.Δ - χ′_nλ1 - block_i.Δ)
+
+                            dpair_ij.Ω11[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * pair_ij.Ω11[n, λ1, n_p, λ1_p]
+                        end
+                    end
+
+                    for λ1 in 1:N_λ1_i
+                        χ′_nλ1 = χ′_i[n, λ1]
+                        Γ′_nλ1 = Γ′_i[n, λ1]
+                        for λ2_p in 1:N_λ2_j
+                            λglob_2p = N_λ1_j + λ2_p
+                            χ_j_npl2p = χ_j[n_p, λglob_2p]
+                            Γ_j_npl2p = Γ_j[n_p, λglob_2p]
+
+                            term1 = -1im * Γ_j_npl2p * dot1[λ1]
+                            term2 = -1im * Γ′_nλ1 * dot4[λ2_p]
+                            pref3 = -1im * (χ_j_npl2p + block_j.Δ - χ′_nλ1 - block_i.Δ)
+
+                            dpair_ij.Ω12[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * pair_ij.Ω12[n, λ1, n_p, λ2_p]
+                        end
+                    end
+
+                    for λ2 in 1:N_λ2_i
+                        λglob_2 = N_λ1_i + λ2
+                        χ′_nλ2 = χ′_i[n, λglob_2]
+                        Γ′_nλ2 = Γ′_i[n, λglob_2]
+                        for λ1_p in 1:N_λ1_j
+                            χ_j_npl1p = χ_j[n_p, λ1_p]
+                            Γ_j_npl1p = Γ_j[n_p, λ1_p]
+
+                            term1 = -1im * Γ_j_npl1p * dot3[λ2]
+                            term2 = -1im * Γ′_nλ2 * dot2[λ1_p]
+                            pref3 = -1im * (χ_j_npl1p + block_j.Δ - χ′_nλ2 - block_i.Δ)
+
+                            dpair_ij.Ω21[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * pair_ij.Ω21[n, λ2, n_p, λ1_p]
+                        end
                     end
                 end
             end
