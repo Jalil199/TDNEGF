@@ -352,6 +352,57 @@ function eom_tdnegf!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::ModelPara
 end
 
 """
+    ExtraBathSpec
+
+Runtime descriptor for extra baths coupled to arbitrary system DOFs.
+Currently implemented type: `:nonhermitian_retarded`.
+"""
+struct ExtraBathSpec
+    bath_type::Symbol
+    label::Symbol
+    idx_couple::Vector{Int}
+    ΣR::Matrix{ComplexF64}
+    enabled::Bool
+
+    function ExtraBathSpec(
+        bath_type::Symbol,
+        label::Symbol,
+        idx_couple::Vector{Int},
+        ΣR::Matrix{ComplexF64},
+        enabled::Bool=true,
+    )
+        length(idx_couple) > 0 || throw(ArgumentError("idx_couple must be non-empty"))
+        size(ΣR) == (length(idx_couple), length(idx_couple)) ||
+            throw(ArgumentError("size(ΣR) must match length(idx_couple)"))
+        return new(bath_type, label, idx_couple, ΣR, enabled)
+    end
+end
+
+@inline function _build_Γ_full(Ns::Int, bath::ExtraBathSpec)
+    Γ_local = 1im .* (bath.ΣR .- bath.ΣR')
+    Γ_full = zeros(ComplexF64, Ns, Ns)
+    idx = bath.idx_couple
+    @inbounds for ia in eachindex(idx), ib in eachindex(idx)
+        Γ_full[idx[ia], idx[ib]] = Γ_local[ia, ib]
+    end
+    return Γ_full
+end
+
+@inline function _rhs_ρ_extra_baths!(dρ_ab, ρ_ab, extra_baths::Vector{ExtraBathSpec}, Ns::Int)
+    for bath in extra_baths
+        bath.enabled || continue
+        bath.bath_type == :nonhermitian_retarded ||
+            throw(ArgumentError("Unsupported extra bath type $(bath.bath_type) in first implementation"))
+        all(1 <= i <= Ns for i in bath.idx_couple) ||
+            throw(ArgumentError("Bath $(bath.label) has idx_couple outside 1:Ns"))
+
+        Γ_full = _build_Γ_full(Ns, bath)
+        dρ_ab .+= -0.5 .* (Γ_full * ρ_ab .+ ρ_ab * Γ_full)
+    end
+    return nothing
+end
+
+"""
     ExperimentalBlockRHSParams
 
 Preallocated workspaces and immutable metadata for `eom_tdnegf_blocks!`.
@@ -371,6 +422,8 @@ Base.@kwdef struct ExperimentalBlockRHSParams
     # Dynamic block energy shifts (Δ) used in Ψ/Ω RHS terms.
     # Kept at problem level so scans can update Δ without rebuilding blocks.
     Δ_blocks::Vector{ComplexF64}
+    # Runtime-only extra baths acting on arbitrary device DOFs.
+    extra_baths::Vector{ExtraBathSpec} = ExtraBathSpec[]
     dims_ρ_ab::NTuple{2,Int}
     size_ρ_ab::Int
     aux_layout::SelfEnergyAuxLayout
@@ -402,7 +455,12 @@ Base.@kwdef struct ExperimentalBlockRHSParams
     obs_site_ranges::Vector{UnitRange{Int}}
 end
 
-function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{SelfEnergyBlock}, Δ_blocks::Vector{ComplexF64})
+function ExperimentalBlockRHSParams(
+    H_ab::Matrix{ComplexF64},
+    blocks::Vector{SelfEnergyBlock},
+    Δ_blocks::Vector{ComplexF64},
+    extra_baths::Vector{ExtraBathSpec}=ExtraBathSpec[],
+)
     Ns = size(H_ab, 1)
     size(H_ab, 2) == Ns || throw(ArgumentError("H_ab must be square"))
     length(Δ_blocks) == length(blocks) || throw(ArgumentError("length(Δ_blocks) must match length(blocks)"))
@@ -449,6 +507,7 @@ function ExperimentalBlockRHSParams(H_ab::Matrix{ComplexF64}, blocks::Vector{Sel
     return ExperimentalBlockRHSParams(
         H_ab = H_ab,
         Δ_blocks = Δ_blocks,
+        extra_baths = extra_baths,
         dims_ρ_ab = dims_ρ_ab,
         size_ρ_ab = size_ρ_ab,
         aux_layout = aux_layout,
@@ -486,10 +545,11 @@ function ExperimentalBlockRHSParams(
     blocks::Vector{SelfEnergyBlock},
     Δ_blocks::Vector{ComplexF64},
     p_obs::ModelParamsTDNEGF,
+    extra_baths::Vector{ExtraBathSpec}=ExtraBathSpec[],
 )
     # Preferred constructor for block observables: it stores geometry and
     # Pauli matrices required by obs_Ixα!(ptr, p_blocks, obs).
-    p = ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks)
+    p = ExperimentalBlockRHSParams(H_ab, blocks, Δ_blocks, extra_baths)
     obs_N_sites = p_obs.N_sites
     obs_N_loc = p_obs.N_loc
     obs_N_sites * obs_N_loc == p.dims_ρ_ab[1] || throw(ArgumentError("Observable geometry mismatch: N_sites*N_loc = $(obs_N_sites * obs_N_loc), expected $(p.dims_ρ_ab[1])."))
@@ -497,6 +557,7 @@ function ExperimentalBlockRHSParams(
     return ExperimentalBlockRHSParams(
         H_ab = p.H_ab,
         Δ_blocks = p.Δ_blocks,
+        extra_baths = p.extra_baths,
         dims_ρ_ab = p.dims_ρ_ab,
         size_ρ_ab = p.size_ρ_ab,
         aux_layout = p.aux_layout,
@@ -796,5 +857,6 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
     end
 
     _rhs_ρ!(dρ_ab, ρ_ab, p.H_ab, p.Hρ, p.Π_ab, p.dims_ρ_ab[1])
+    _rhs_ρ_extra_baths!(dρ_ab, ρ_ab, p.extra_baths, p.dims_ρ_ab[1])
     return nothing
 end
