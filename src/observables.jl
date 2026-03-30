@@ -56,6 +56,29 @@ end
 ### Charge density
 ### this function calculates local charge density from the global density matrix `ρ_ab`.
 ### It is backend-independent and accepts both `pointer(...)` and `pointer_blocks(...)` views.
+
+
+@inline function _accumulate_spin_trace(Bloc, σx, σy, σz, N_loc::Int)
+    N_spin = size(σx, 1)
+    (N_spin == 2 && size(σx, 2) == 2) || throw(ArgumentError("Pauli matrices must be 2×2 in spin space"))
+    N_loc % N_spin == 0 || throw(ArgumentError("N_loc must be divisible by spin dimension"))
+    N_orb = N_loc ÷ N_spin
+
+    sx = 0.0; sy = 0.0; sz = 0.0
+    @inbounds for orb in 0:(N_orb - 1)
+        base = orb * N_spin
+        for aσ in 1:N_spin, bσ in 1:N_spin
+            a = base + aσ
+            b = base + bσ
+            ρba = Bloc[b, a]
+            sx += real(σx[aσ, bσ] * ρba)
+            sy += real(σy[aσ, bσ] * ρba)
+            sz += real(σz[aσ, bσ] * ρba)
+        end
+    end
+    return sx, sy, sz
+end
+
 @inline function obs_n_i!(dv, p::ModelParamsTDNEGF, obs::ObservablesTDNEGF)
     #### It updates the iterative element associated with temporal index (idx)
     #### the updated index is moved to evolution loop 
@@ -88,13 +111,7 @@ end
         b0 = i * N_loc
         ρloc = @view ρ[a0:b0, a0:b0]
 
-        sx=0.0; sy=0.0; sz=0.0
-        @inbounds for a in 1:N_loc, b in 1:N_loc
-            ρba = ρloc[b,a]   # tr(σ ρ) = Σ_ab σ_ab ρ_ba
-            sx += real(σx[a,b] * ρba)
-            sy += real(σy[a,b] * ρba)
-            sz += real(σz[a,b] * ρba)
-        end
+        sx, sy, sz = _accumulate_spin_trace(ρloc, σx, σy, σz, N_loc)
         obs.σx_i[i,1,it] = sx
         obs.σx_i[i,2,it] = sy
         obs.σx_i[i,3,it] = sz
@@ -113,13 +130,7 @@ end
         b0 = i * N_loc
         ρloc = @view ρ[a0:b0, a0:b0]
 
-        sx=0.0; sy=0.0; sz=0.0
-        @inbounds for a in 1:N_loc, b in 1:N_loc
-            ρba = ρloc[b,a]   # tr(σ ρ) = Σ_ab σ_ab ρ_ba
-            sx += real(σx[a,b] * ρba)
-            sy += real(σy[a,b] * ρba)
-            sz += real(σz[a,b] * ρba)
-        end
+        sx, sy, sz = _accumulate_spin_trace(ρloc, σx, σy, σz, N_loc)
         obs.σx_i_eq[i,1,it] = sx
         obs.σx_i_eq[i,2,it] = sy
         obs.σx_i_eq[i,3,it] = sz
@@ -227,13 +238,7 @@ end
             a0 = (i - 1) * N_loc + 1
             b0 = i * N_loc
             Πloc = @view Πα[a0:b0, a0:b0]
-            tx=0.0; ty=0.0; tz=0.0
-            @inbounds for a in 1:N_loc, b in 1:N_loc
-                Πba = Πloc[b,a]
-                tx += real(σx[a,b] * Πba)
-                ty += real(σy[a,b] * Πba)
-                tz += real(σz[a,b] * Πba)
-            end
+            tx, ty, tz = _accumulate_spin_trace(Πloc, σx, σy, σz, N_loc)
             sx += tx; sy += ty; sz += tz
         end
 
@@ -271,13 +276,8 @@ unless blocks are configured one-per-physical-lead.
         sx = 0.0; sy = 0.0; sz = 0.0
         for i in 1:p_blocks.obs_N_sites
             r = p_blocks.obs_site_ranges[i]
-            tx = 0.0; ty = 0.0; tz = 0.0
-            for a in 1:p_blocks.obs_N_loc, b in 1:p_blocks.obs_N_loc
-                Πba = Πα[r[b], r[a]]
-                tx += real(σx[a, b] * Πba)
-                ty += real(σy[a, b] * Πba)
-                tz += real(σz[a, b] * Πba)
-            end
+            Πloc = @view Πα[r, r]
+            tx, ty, tz = _accumulate_spin_trace(Πloc, σx, σy, σz, p_blocks.obs_N_loc)
             sx += tx; sy += ty; sz += tz
         end
         obs.Iαx[α, 1, it] = 2 * sx
@@ -315,13 +315,9 @@ Use this only when `p_blocks` was built without observable metadata via
         sx = 0.0; sy = 0.0; sz = 0.0
         for i in 1:p_model.N_sites
             a0 = (i - 1) * N_loc + 1
-            tx = 0.0; ty = 0.0; tz = 0.0
-            for a in 1:N_loc, b in 1:N_loc
-                Πba = Πα[a0 + b - 1, a0 + a - 1]
-                tx += real(σx[a, b] * Πba)
-                ty += real(σy[a, b] * Πba)
-                tz += real(σz[a, b] * Πba)
-            end
+            r = a0:(a0 + N_loc - 1)
+            Πloc = @view Πα[r, r]
+            tx, ty, tz = _accumulate_spin_trace(Πloc, σx, σy, σz, N_loc)
             sx += tx; sy += ty; sz += tz
         end
         obs.Iαx[α, 1, it] = 2 * sx
