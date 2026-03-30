@@ -264,22 +264,6 @@ function plot_final_density_profile(case_nogap, case_gap)
     return fig
 end
 
-function plot_spin_sanity(case_nogap, case_gap)
-    max_nogap = vec(maximum(abs.(case_nogap.obs.σx_i); dims=(1, 2)))
-    max_gap = vec(maximum(abs.(case_gap.obs.σx_i); dims=(1, 2)))
-
-    fig, ax = subplots(1, 1, figsize=(6, 4))
-    ax.semilogy(case_nogap.obs.t, max_nogap .+ eps(Float64), label="No gap")
-    ax.semilogy(case_gap.obs.t, max_gap .+ eps(Float64), label="Central gap")
-    ax.set_xlabel("t")
-    ax.set_ylabel(L"\max_i |\langle\sigma_i\rangle|")
-    ax.set_title("Spin-density sanity check")
-    ax.grid(true, which="both", alpha=0.3)
-    ax.legend(frameon=false)
-    tight_layout()
-    return fig
-end
-
 function main()
     cfg = init_params_blocks_1d_twochannel()
 
@@ -296,11 +280,6 @@ function main()
                                              eps_v_center=-cfg.Δ/2,
                                              label="central-gap")
 
-    maxspin_nogap = maximum(abs.(case_nogap.obs.σx_i))
-    maxspin_gap = maximum(abs.(case_gap.obs.σx_i))
-
-    println("max |σ_i| (no-gap)   = $(maxspin_nogap)")
-    println("max |σ_i| (gap)      = $(maxspin_gap)")
     println("mean I_L (no-gap)    = $(mean(case_nogap.obs.Iα[1, :]))")
     println("mean I_L (gap)       = $(mean(case_gap.obs.Iα[1, :]))")
 
@@ -312,7 +291,6 @@ function main()
     plot_currents(case_nogap, case_gap)
     plot_site_densities(case_nogap, case_gap)
     plot_final_density_profile(case_nogap, case_gap)
-    plot_spin_sanity(case_nogap, case_gap)
 
     println("Saved: examples/data/example4_1d_twochannel_benchmark.jl2")
 end
