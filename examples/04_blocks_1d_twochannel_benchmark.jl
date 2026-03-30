@@ -94,7 +94,7 @@ end
 "Initializer for Example 4 (block backend, 1D two-channel benchmark)."
 function init_params_blocks_1d_twochannel(; Nx::Int=10, Ny::Int=1, Nσ::Int=2, N_orb::Int=2,
                                           tc::Float64=-1.0, tv::Float64=+1.0,
-                                          Δ::Float64=1.0,
+                                          Δ::Float64=5.0,
                                           eps_c_lead::Float64=0.0, eps_v_lead::Float64=0.0,
                                           Vbias::Float64=0.2,
                                           t_end::Float64=80.0, dt::Float64=0.2,
@@ -204,8 +204,13 @@ function plot_bloch_dispersion_comparison(cfg)
         axs[1].plot(kgrid, E_nogap[b, :], color="tab:blue", linewidth=1.2)
         axs[2].plot(kgrid, E_gap[b, :], color="tab:red", linewidth=1.2)
     end
-    axs[1].set_title("Bloch bands (no-gap)")
-    axs[2].set_title("Bloch bands (central-gap)")
+
+    # indirect orbital gap estimate: min_k(Ec_min(k) - Ev_max(k))
+    Egap_nogap = minimum(E_nogap[3, :] .- E_nogap[2, :])
+    Egap_gap = minimum(E_gap[3, :] .- E_gap[2, :])
+
+    axs[1].set_title("Bloch bands (no-gap), Eg=$(round(Egap_nogap, digits=3))")
+    axs[2].set_title("Bloch bands (central-gap), Eg=$(round(Egap_gap, digits=3))")
     for ax in axs
         ax.set_xlabel(L"k")
         ax.grid(true, alpha=0.3)
