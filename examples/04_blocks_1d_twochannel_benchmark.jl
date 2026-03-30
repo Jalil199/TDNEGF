@@ -205,6 +205,26 @@ function plot_isolated_spectra(case_nogap, case_gap)
     return fig
 end
 
+
+
+"Plot only the central-gap isolated spectrum with guide lines at ±Δ/2."
+function plot_gap_only_spectrum(case_gap, Δ::Float64)
+    evals_gap = sort(real(eigvals(case_gap.H)))
+    n = 1:length(evals_gap)
+
+    fig, ax = subplots(1, 1, figsize=(6, 4))
+    ax.scatter(n, evals_gap, s=18, color="tab:red", label="Gap case eigenvalues")
+    ax.axhline(+Δ/2, color="k", linestyle="--", linewidth=1.0, label=L"+\Delta/2")
+    ax.axhline(-Δ/2, color="k", linestyle="--", linewidth=1.0, label=L"-\Delta/2")
+    ax.set_xlabel("Eigenvalue index")
+    ax.set_ylabel(L"E_n")
+    ax.set_title("Central-gap isolated spectrum")
+    ax.grid(true, axis="y", alpha=0.3)
+    ax.legend(frameon=false)
+    tight_layout()
+    return fig
+end
+
 function plot_currents(case_nogap, case_gap)
     fig, axs = subplots(1, 2, figsize=(11, 4), sharey=true)
 
@@ -288,6 +308,7 @@ function main()
 
     plot_lead_dispersion(cfg)
     plot_isolated_spectra(case_nogap, case_gap)
+    plot_gap_only_spectrum(case_gap, cfg.Δ)
     plot_currents(case_nogap, case_gap)
     plot_site_densities(case_nogap, case_gap)
     plot_final_density_profile(case_nogap, case_gap)
