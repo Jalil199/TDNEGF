@@ -168,6 +168,56 @@ function run_case_blocks_1d_twochannel(cfg; eps_c_center::Float64, eps_v_center:
     )
 end
 
+
+
+"Bloch Hamiltonian H(k) for the infinite 1D two-orbital chain in basis (c↑, c↓, v↑, v↓)."
+@inline function bloch_Hk_1d_twochannel(k::Float64; tc::Float64, tv::Float64,
+                                       eps_c::Float64, eps_v::Float64)
+    ec = eps_c + 2 * tc * cos(k)
+    ev = eps_v + 2 * tv * cos(k)
+    # spin-degenerate, orbital-diagonal 4x4 Bloch Hamiltonian
+    return ComplexF64[
+        ec 0  0  0;
+        0  ec 0  0;
+        0  0  ev 0;
+        0  0  0  ev
+    ]
+end
+
+"Compare infinite-chain Bloch dispersions for no-gap and central-gap parameter sets."
+function plot_bloch_dispersion_comparison(cfg)
+    kgrid = range(-π, π; length=400)
+    E_nogap = Matrix{Float64}(undef, 4, length(kgrid))
+    E_gap = Matrix{Float64}(undef, 4, length(kgrid))
+
+    for (ik, k) in enumerate(kgrid)
+        Hk0 = bloch_Hk_1d_twochannel(k; tc=cfg.tc, tv=cfg.tv,
+                                     eps_c=cfg.eps_c_lead, eps_v=cfg.eps_v_lead)
+        Hkg = bloch_Hk_1d_twochannel(k; tc=cfg.tc, tv=cfg.tv,
+                                     eps_c=+cfg.Δ/2, eps_v=-cfg.Δ/2)
+        E_nogap[:, ik] .= sort(real(eigvals(Hk0)))
+        E_gap[:, ik] .= sort(real(eigvals(Hkg)))
+    end
+
+    fig, axs = subplots(1, 2, figsize=(11, 4), sharey=true)
+    for b in 1:4
+        axs[1].plot(kgrid, E_nogap[b, :], color="tab:blue", linewidth=1.2)
+        axs[2].plot(kgrid, E_gap[b, :], color="tab:red", linewidth=1.2)
+    end
+    axs[1].set_title("Bloch bands (no-gap)")
+    axs[2].set_title("Bloch bands (central-gap)")
+    for ax in axs
+        ax.set_xlabel(L"k")
+        ax.grid(true, alpha=0.3)
+    end
+    axs[1].set_ylabel(L"E(k)")
+    axs[2].axhline(+cfg.Δ/2, color="k", linestyle="--", linewidth=1.0)
+    axs[2].axhline(-cfg.Δ/2, color="k", linestyle="--", linewidth=1.0)
+    suptitle("Infinite central-region Bloch dispersion")
+    tight_layout()
+    return fig
+end
+
 "Plot analytic lead dispersions Ec(k), Ev(k)."
 function plot_lead_dispersion(cfg)
     k = range(-π, π; length=400)
@@ -307,6 +357,7 @@ function main()
     @save "examples/data/example4_1d_twochannel_benchmark.jl2" cfg case_nogap case_gap
 
     plot_lead_dispersion(cfg)
+    plot_bloch_dispersion_comparison(cfg)
     plot_isolated_spectra(case_nogap, case_gap)
     plot_gap_only_spectrum(case_gap, cfg.Δ)
     plot_currents(case_nogap, case_gap)
