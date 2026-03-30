@@ -147,10 +147,13 @@ For legacy reproduction/validation, the rectangular path is still available via
 
 If you want to copy a working workflow quickly, start here:
 
-- Script: `examples/01_two_terminal_square_lattice.jl`
+- Scripts:
+  - `examples/01_two_terminal_square_lattice.jl`
+  - `examples/04_blocks_1d_twochannel_benchmark.jl`
 - Notebooks:
   - `examples/notebooks/01_two_terminal_square_lattice.ipynb`
   - `examples/notebooks/02_spin_dynamics_and_electrons.ipynb`
+  - `examples/notebooks/04_blocks_1d_twochannel_benchmark.ipynb`
 
 These examples show the end-to-end block workflow:
 block construction, `ExperimentalBlockRHSParams`, solving with `eom_tdnegf_blocks!`,
