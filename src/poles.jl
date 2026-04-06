@@ -21,21 +21,34 @@ end
 ferm_test(x::ComplexF64,η_k::Vector{ComplexF64},
             ξ_k::Vector{ComplexF64},β::Float64) = 0.5- sum(η_k/β.*(1 ./( 1im*ξ_k/β .+ x ) .+  1 ./( -1im*ξ_k/β .+ x )   )) 
 
+function _load_precomputed_complex_table(path::AbstractString)
+    data = readdlm(path)
+    size(data, 2) == 2 || throw(ArgumentError("expected two-column complex table at $path"))
+    return complex.(data[:, 1], data[:, 2])
+end
+
+function _load_λ1_square_data(N_λ1::Int)
+    path = joinpath(dirname(@__DIR__), "data")
+    if N_λ1 == 49
+        z_path = joinpath(path, "z_Semicircle_N49.txt")
+        r_path = joinpath(path, "R_Semicircle_N49.txt")
+        zλ1 = _load_precomputed_complex_table(z_path)
+        Rλ1 = _load_precomputed_complex_table(r_path) .* (2pi)
+        return Rλ1, zλ1
+    elseif N_λ1 == 31
+        z_path = joinpath(path, "z_Lorentz_N31.txt")
+        r_path = joinpath(path, "R_Lorentz_N31.txt")
+        zλ1 = _load_precomputed_complex_table(z_path)
+        Rλ1 = _load_precomputed_complex_table(r_path)
+        return Rλ1, zλ1
+    end
+    throw(ArgumentError("There are not precalculated quantities for N_λ1=$N_λ1"))
+end
+
 function load_poles_square(N_λ1::Int = 49, N_λ2::Int = 20)
-    @assert N_λ1==49 "There are not precalculated quantities for this number of poles"
     ### Calculates the fermi poles 
     zλ2, Rλ2 = pade_poles(N_λ2)
-    ### Get the precalculated poles from MP external package
-    path = joinpath(dirname(@__DIR__))
-    data_z = readdlm(path*"/data/z_Semicircle_N49.txt")  # matriz N×2
-    data_R = readdlm(path*"/data/R_Semicircle_N49.txt")  # matriz N×2
-    ### In the future an option to call MP packge should be added
-    #------------------------------------------------------------
-    
-    #------------------------------------------------------------
-    zλ1 = complex.(data_z[:, 1], data_z[:, 2])  # Vector{ComplexF64}
-    Rλ1 = complex.(data_R[:, 1], data_R[:, 2]) ; # Vector{ComplexF64};
-    Rλ1 = Rλ1*2pi ; ### added by convention 
+    Rλ1, zλ1 = _load_λ1_square_data(N_λ1)
     Rλ = [Rλ1;  Rλ2]
     zλ = [zλ1;  zλ2]
     
