@@ -1,17 +1,22 @@
 ### test_selfenergy_timedomain.jl
 ###
-### Two checks for the pole representation of the lead self-energy:
+### Checks for the lead self-energy representations:
 ###
-###  1. Spectral check: G_rec(ω, R, z) reconstructs the exact semicircle Γ(ω)
-###  2. Time-domain check: the pole sum Σ^<(t) = Σ_λ ΣL_nλ exp(-i χ_nλ t)
-###     matches the direct numerical Fourier transform
-###     Σ^<(t) = ∫ dω/(2π) f(ω) Γ(ω) e^{-iωt}
+###  A. Legacy Lorentzian fit (old code):
+###     Γ_lor(ω) = Σ_k gam_k w0_k² / ((ω-eps_k)² + w0_k²)
+###     vs exact semicircle Γ(ω) = -2 Im Σ^R(ω)
 ###
-###  Both checks are run for N_λ1 = 49 (semicircle) and N_λ1 = 31 (Lorentz).
+###  B. Minimal pole representation (new code):
+###     1. Spectral check: G_rec(ω, R, z) reconstructs the exact Γ(ω)
+###     2. Time-domain: pole sum Σ^<(t) = -i Σ_λ ΣL_nλ exp(-i χ_nλ t)
+###        matches direct numerical FT ∫ dω/(2π) f(ω) Γ(ω) e^{-iωt}
+###
+###  Checks B are run for N_λ1 = 49 (semicircle) and N_λ1 = 31 (Lorentz).
 ###  The 1D case (Ny=1) is used so ϵ_n = 0 and the channel index is trivial.
 
 using Test
 using LinearAlgebra
+using DelimitedFiles
 using TDNEGF
 
 # -----------------------------------------------------------------------
@@ -164,3 +169,41 @@ const t_TEST = collect(0.0:0.5:20.0)
     end  # for label
 
 end  # testset
+
+# -----------------------------------------------------------------------
+# Legacy Lorentzian reconstruction check
+# -----------------------------------------------------------------------
+# The old code (TDNEGF_exciton_B) fits Γ(ω) as a sum of Lorentzians:
+#   Γ_lor(ω) = Σ_k gam_k * w0_k² / ((ω - eps_k)² + w0_k²)
+# Parameters are stored in two CSV files (legacy/selfenergy/):
+#   selfenergy_1DTB_NNLS_31_pbest.csv — alternating eps_k, w0_k (62 lines)
+#   selfenergy_1DTB_NNLS_31_Ulsq.csv  — gam_k (31 lines)
+# This test checks that those parameters faithfully reproduce the
+# exact semicircle Γ(ω) = -2 Im Σ^R(ω) within the band.
+
+const LEGACY_SE_DIR = joinpath(@__DIR__, "..", "legacy", "selfenergy")
+const TOL_LORENTZ_LEGACY = 0.10   # max pointwise error inside the band
+
+function Γ_lorentz(ω::Float64,
+                   eps::Vector{Float64},
+                   w0::Vector{Float64},
+                   gam::Vector{Float64})
+    return sum(gam[k] * w0[k]^2 / ((ω - eps[k])^2 + w0[k]^2) for k in eachindex(eps))
+end
+
+@testset "Legacy Lorentzian reconstruction of Γ(ω)" begin
+    pbest = vec(readdlm(joinpath(LEGACY_SE_DIR, "selfenergy_1DTB_NNLS_31_pbest.csv"), Float64))
+    ulsq  = vec(readdlm(joinpath(LEGACY_SE_DIR, "selfenergy_1DTB_NNLS_31_Ulsq.csv"),  Float64))
+
+    eps_k = pbest[1:2:end]    # resonant level positions
+    w0_k  = pbest[2:2:end]    # level widths (positive)
+    gam_k = ulsq              # amplitudes
+
+    ωs      = collect(-1.8:0.05:1.8)
+    Γ_exact = exact_Γ.(ωs)
+    Γ_lor   = [Γ_lorentz(ω, eps_k, w0_k, gam_k) for ω in ωs]
+
+    err = max_abs(Γ_exact, Γ_lor)
+    @test err < TOL_LORENTZ_LEGACY
+    println("  [Legacy Lorentz N31] Spectral: max_abs(Γ_exact - Γ_lor) = $(round(err, sigdigits=3))")
+end
