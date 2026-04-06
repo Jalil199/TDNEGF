@@ -195,7 +195,20 @@ function Γ_lorentz(ω::Float64,
     return sum(gam[k] * w0[k]^2 / ((ω - eps[k])^2 + w0[k]^2) for k in eachindex(eps))
 end
 
-@testset "Legacy Lorentzian reconstruction of Γ(ω)" begin
+## Direct FT of Σ^< using Γ_lor instead of Γ_exact — for comparison against the exact FT
+## This quantifies how much the spectral fit error propagates to the time domain.
+function ΣL_lorentz_ft(t::Float64; β::Float64,
+                        eps::Vector{Float64}, w0::Vector{Float64}, gam::Vector{Float64},
+                        ω_max::Float64=8.0, dω::Float64=0.005)
+    ωs = -ω_max:dω:ω_max
+    integrand = [fermi(ω; β=β) * Γ_lorentz(ω, eps, w0, gam) * exp(-1im * ω * t)
+                 for ω in ωs]
+    return (dω / (2π)) * (sum(integrand) - 0.5 * (integrand[1] + integrand[end]))
+end
+
+const TOL_TIMEDOMAIN_LEGACY = 0.06   # legacy Γ fit is imperfect → slightly larger tolerance
+
+@testset "Legacy Lorentzian: spectral and time-domain vs exact" begin
     pbest = vec(readdlm(joinpath(LEGACY_SE_DIR, "selfenergy_1DTB_NNLS_31_pbest.csv"), Float64))
     ulsq  = vec(readdlm(joinpath(LEGACY_SE_DIR, "selfenergy_1DTB_NNLS_31_Ulsq.csv"),  Float64))
 
@@ -203,11 +216,26 @@ end
     w0_k  = pbest[2:2:end]    # level widths (positive)
     gam_k = ulsq              # amplitudes
 
-    ωs      = collect(-1.8:0.05:1.8)
-    Γ_exact = exact_Γ.(ωs)
-    Γ_lor   = [Γ_lorentz(ω, eps_k, w0_k, gam_k) for ω in ωs]
+    @testset "Spectral reconstruction Γ(ω)" begin
+        ωs      = collect(-1.8:0.05:1.8)
+        Γ_exact = exact_Γ.(ωs)
+        Γ_lor   = [Γ_lorentz(ω, eps_k, w0_k, gam_k) for ω in ωs]
 
-    err = max_abs(Γ_exact, Γ_lor)
-    @test err < TOL_LORENTZ_LEGACY
-    println("  [Legacy Lorentz N31] Spectral: max_abs(Γ_exact - Γ_lor) = $(round(err, sigdigits=3))")
+        err = max_abs(Γ_exact, Γ_lor)
+        @test err < TOL_LORENTZ_LEGACY
+        println("  [Legacy N31] Spectral: max_abs(Γ_exact - Γ_lor) = $(round(err, sigdigits=3))")
+    end
+
+    @testset "Time-domain Σ^<(t): legacy FT vs exact FT" begin
+        # Both are compared against the exact reference FT.
+        # The legacy FT uses Γ_lor; any difference reflects propagation of spectral fit error.
+        ΣL_lor   = [ΣL_lorentz_ft(t; β=β_TEST, eps=eps_k, w0=w0_k, gam=gam_k) for t in t_TEST]
+        ΣL_exact = [ΣL_direct_ft(t, 1; β=β_TEST) for t in t_TEST]
+
+        err_rel = rel_rmse(ΣL_lor, ΣL_exact)
+        err_max = max_abs(ΣL_lor, ΣL_exact)
+
+        @test err_rel < TOL_TIMEDOMAIN_LEGACY
+        println("  [Legacy N31] Time-domain: rel_rmse(Σ^<_lor, Σ^<_exact) = $(round(err_rel, sigdigits=3)), max_abs = $(round(err_max, sigdigits=3))")
+    end
 end
