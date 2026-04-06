@@ -105,6 +105,9 @@ const t_TEST = collect(0.0:0.5:20.0)
 
 @testset "Self-energy pole representation" begin
 
+    # Note: "Lorentz N31" uses z_Lorentz_N31.txt / R_Lorentz_N31.txt, which are
+    # the legacy NNLS_31 CSV parameters (eps_k, w0_k, gam_k) converted to the
+    # complex-pole format. They are the same underlying fit, not an independent one.
     for (label, N_λ1, tol_spec) in [("Semicircle N49", 49, TOL_SPECTRAL_N49),
                                      ("Lorentz N31",    31, TOL_SPECTRAL_N31)]
 
@@ -178,8 +181,9 @@ end  # testset
 # Parameters are stored in two CSV files (legacy/selfenergy/):
 #   selfenergy_1DTB_NNLS_31_pbest.csv — alternating eps_k, w0_k (62 lines)
 #   selfenergy_1DTB_NNLS_31_Ulsq.csv  — gam_k (31 lines)
-# This test checks that those parameters faithfully reproduce the
-# exact semicircle Γ(ω) = -2 Im Σ^R(ω) within the band.
+# z_Lorentz_N31.txt / R_Lorentz_N31.txt are these same parameters converted
+# to complex-pole format (poles: eps_k ± i*w0_k, residues from gam_k*w0_k).
+# This test checks the original CSV form against the exact Γ(ω).
 
 const LEGACY_SE_DIR = joinpath(@__DIR__, "..", "legacy", "selfenergy")
 const TOL_LORENTZ_LEGACY = 0.10   # max pointwise error inside the band
