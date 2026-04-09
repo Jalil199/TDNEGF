@@ -1,0 +1,4 @@
+legacy/** linguist-vendored
+notebooks/** linguist-vendored
+*.jl linguist-detectable=true
+*.ipynb linguist-detectable=false
