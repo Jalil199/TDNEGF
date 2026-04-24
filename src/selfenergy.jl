@@ -30,51 +30,39 @@ module SelfEnergySquare
     
     ### This function creates an instance of the effective residues 
     ### of the lesser component Σ in the diagonal basis
-    function build_Σᴸ_nλ(Rλ::Vector{ComplexF64}, zλ::Vector{ComplexF64}, Ny::Int, Nσ::Int, N_orb::Int, Nλ1::Int, Nλ2::Int ; β::Float64,γ::Float64 = 1.0)
-        ## It need two external functions which are: fermi and Γ_r
-        # Note that for square lattice selfenergy 
-        # all the elements can be builded from the semicircle leveldiwth function  and
-        # for both spin up and spin down the system should be repeated for nonmagnetic leads
+    function build_Σᴸ_nλ(Rλ::Vector{ComplexF64}, zλ::Vector{ComplexF64}, Ny::Int, Nσ::Int, N_orb::Int, Nλ1::Int, Nλ2::Int ; β::Float64,γ::Float64 = 1.0, μ::Float64 = 0.0)
         Nλ::Int    = Nλ1 + Nλ2
         Nc::Int    = Ny*Nσ*N_orb
         dims_Σᴸ_nλ = (Nc, Nλ)
         Σᴸ_nλ      = zeros(ComplexF64, dims_Σᴸ_nλ)
-        ### This function calculates the effetive level-diwth function from the MPM method.
         Γ_r(w) =   G_rec(w, Rλ[1:Nλ1], zλ[1:Nλ1])
-        ### 
         for i in 1:Ny
             n_idx = get_sub(i, Nσ*N_orb)
-            ### Run over the poles of the fermi function 
             for λ1 in 1:Nλ1
-                Σᴸ_nλ[n_idx,λ1] .= Rλ[λ1]*fermi( zλ[λ1]+ϵ_n(i,Ny,γ=γ) ,β=β )
+                Σᴸ_nλ[n_idx,λ1] .= Rλ[λ1]*fermi( zλ[λ1]+ϵ_n(i,Ny,γ=γ)-μ ,β=β )
             end
-            ### Run over the poles of the fermi function 
             for λ2 in Nλ1+1:Nλ
-                Σᴸ_nλ[n_idx,λ2] .= (Rλ[λ2]/β)*Γ_r(zλ[λ2]/β-ϵ_n(i,Ny,γ=γ)) #*4pi#Γ(zλ[λ2],i,Ny)
+                Σᴸ_nλ[n_idx,λ2] .= (Rλ[λ2]/β)*Γ_r(zλ[λ2]/β + μ - ϵ_n(i,Ny,γ=γ))
             end
         end
         return Σᴸ_nλ
     end
     
-    ### This function creates an instance of the effective residues 
+    ### This function creates an instance of the effective residues
     ### of the greater component Σ in the diagonal basis
-    function build_Σᴳ_nλ(Rλ::Vector{ComplexF64}, zλ::Vector{ComplexF64}, Ny::Int, Nσ::Int, N_orb::Int, Nλ1::Int, Nλ2::Int ;β::Float64,γ::Float64 = 1.0)
+    function build_Σᴳ_nλ(Rλ::Vector{ComplexF64}, zλ::Vector{ComplexF64}, Ny::Int, Nσ::Int, N_orb::Int, Nλ1::Int, Nλ2::Int ;β::Float64,γ::Float64 = 1.0, μ::Float64 = 0.0)
         Nλ::Int    = Nλ1 + Nλ2
         Nc::Int    = Ny*Nσ*N_orb
         dims_Σᴳ_nλ = (Nc, Nλ)
         Σᴳ_nλ      = zeros(ComplexF64, dims_Σᴳ_nλ)
-        ### This function calculates the effetive level-diwth function from the MPM method.
         Γ_r(w) =   G_rec(w, Rλ[1:Nλ1], zλ[1:Nλ1])
-        ### 
         for i in 1:Ny
             n_idx = get_sub(i, Nσ*N_orb)
-            ### Run over the poles of the fermi function 
             for λ1 in 1:Nλ1
-                Σᴳ_nλ[n_idx,λ1] .= -Rλ[λ1]*(1-fermi( zλ[λ1]+ϵ_n(i,Ny,γ=γ), β=β )) ### Note the beta function 
+                Σᴳ_nλ[n_idx,λ1] .= -Rλ[λ1]*(1-fermi( zλ[λ1]+ϵ_n(i,Ny,γ=γ)-μ ,β=β ))
             end
-            ### Run over the poles of the fermi function 
             for λ2 in Nλ1+1:Nλ
-                Σᴳ_nλ[n_idx,λ2] .= (Rλ[λ2]/β )*Γ_r(zλ[λ2]/β-ϵ_n(i,Ny,γ=γ))
+                Σᴳ_nλ[n_idx,λ2] .= (Rλ[λ2]/β)*Γ_r(zλ[λ2]/β + μ - ϵ_n(i,Ny,γ=γ))
             end
         end
         return Σᴳ_nλ
@@ -82,17 +70,17 @@ module SelfEnergySquare
     
     ### This functiones generates the effective poles to reconstruct the analytical continuation of a 
     ### generic function 
-    function build_χ_nλ(zλ::Vector{ComplexF64}, Ny::Int, Nσ::Int, N_orb::Int, Nλ1::Int, Nλ2::Int; β::Float64,γ::Float64)
+    function build_χ_nλ(zλ::Vector{ComplexF64}, Ny::Int, Nσ::Int, N_orb::Int, Nλ1::Int, Nλ2::Int; β::Float64, γ::Float64, μ::Float64=0.0)
         Nλ::Int   = Nλ1 + Nλ2
         Nc::Int   = Ny*Nσ*N_orb
         dims_χ_nλ = (Nc, Nλ)
         χ_nλ      = zeros(ComplexF64, dims_χ_nλ)
-    
+
         for i in 1:Ny
-            n_idx = get_sub(i, Nσ*N_orb)   # range of local indexes 
+            n_idx = get_sub(i, Nσ*N_orb)   # range of local indexes
             for n in n_idx
                 χ_nλ[n, 1:Nλ1]      .= zλ[1:Nλ1] .+ ϵ_n(i,Ny,γ=γ)
-                χ_nλ[n, Nλ1+1:Nλ]   .= zλ[Nλ1+1:Nλ] / β  
+                χ_nλ[n, Nλ1+1:Nλ]   .= zλ[Nλ1+1:Nλ] / β .+ μ
             end
         end
         return χ_nλ

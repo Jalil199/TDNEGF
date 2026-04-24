@@ -99,7 +99,42 @@ function ΣR_tot(ϵ::Union{Float64,ComplexF64}; γ::Float64=1., γc::Float64=1.0
     Σ_t[iR, iR] .+= Σ_R
     return Σ_t
 end
-### Now The retarded component GF should be computed 
+### Standard Landauer transmission T(E): Σ evaluated at absolute energy E (Meir-Wingreen).
+### H must NOT be shifted. Only the Fermi functions carry the μ_α dependence.
+function transmission_std(E::Float64, H::Matrix{ComplexF64};
+                          γ::Float64=1.0, γc::Float64=1.0,
+                          Ny::Int=2, Nσ::Int=2, η::Float64=1e-8)
+    dim = size(H, 1)
+    Id  = Matrix{ComplexF64}(I, dim, dim)
+    SL  = ΣL_tot(complex(E, η); γ=γ, γc=γc, Nx=div(dim, Ny*Nσ), Ny=Ny, Nσ=Nσ)
+    SR  = ΣR_tot(complex(E, η); γ=γ, γc=γc, Nx=div(dim, Ny*Nσ), Ny=Ny, Nσ=Nσ)
+    Gr  = inv((E + 1im*η)*Id - H - SL - SR)
+    GL  = 1im*(SL - SL')
+    GR  = 1im*(SR - SR')
+    return real(tr(GL * Gr * GR * Gr'))
+end
+
+### Linear-response conductance G(E_F) = (1/2π·δV) ∫ T(E)·[f(E,μL)-f(E,μR)] dE
+### Standard Meir-Wingreen: H unshifted, Σ(E) at absolute energy.
+function landauer_conductance(E_F::Float64;
+                              δV::Float64=0.01, β::Float64=40.0,
+                              γ::Float64=1.0, γc::Float64=1.0,
+                              Nx::Int=1, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
+                              n_pts::Int=4000, η::Float64=1e-8)
+    H  = build_H_ab(; Nx=Nx, Ny=Ny, Nσ=Nσ, N_orb=N_orb, γ=γ, γso=0.0+0.0im)
+    μL = E_F + δV/2;  μR = E_F - δV/2
+    ε_grid = range(-max(6.0, abs(E_F)+3), max(6.0, abs(E_F)+3); length=n_pts)
+    dε = step(ε_grid);  Isum = 0.0
+    for ε in ε_grid
+        T  = transmission_std(Float64(ε), H; γ=γ, γc=γc, Ny=Ny, Nσ=Nσ, η=η)
+        fL = abs(β*(ε-μL)) > 500 ? (ε < μL ? 1.0 : 0.0) : 1.0/(1.0+exp(β*(ε-μL)))
+        fR = abs(β*(ε-μR)) > 500 ? (ε < μR ? 1.0 : 0.0) : 1.0/(1.0+exp(β*(ε-μR)))
+        Isum += T*(fL - fR)*dε
+    end
+    return Isum / (2π * δV)
+end
+
+### Now The retarded component GF should be computed
 function Gr(ϵ::Union{Float64,ComplexF64} ,H::Matrix{ComplexF64}, Σ;η=0.02)
     dims= size(H)[1]
     one = Matrix{ComplexF64}(I, dims,dims  )

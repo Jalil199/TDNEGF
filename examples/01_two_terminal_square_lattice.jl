@@ -39,12 +39,21 @@ function init_params_blocks(;Nx::Int=50, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
 
     H_ab  = build_H_ab(; Nx = p_model.Nx, Ny = p_model.Ny, Nσ = p_model.Nσ,
                         N_orb = p_model.N_orb, γ = γ, γso = γso)
-    Σᴸ_nλ = build_Σᴸ_nλ(Rλ, zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
-                        p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0)
-    Σᴳ_nλ = build_Σᴳ_nλ(Rλ, zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
-                        p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0)
-    χ_nλ  = build_χ_nλ(zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
-                       p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0)
+    # Per-lead convention: μ_α embedded in χ and Σ residues (Meir-Wingreen correct).
+    # Δ_blocks carries only additional AC/scanning bias, not the chemical potential.
+    μ_L =  0.5;  μ_R = -0.5   # DC bias δV=1.0
+    Σᴸ_nλ_L = build_Σᴸ_nλ(Rλ, zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
+                           p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0, μ = μ_L)
+    Σᴳ_nλ_L = build_Σᴳ_nλ(Rλ, zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
+                           p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0, μ = μ_L)
+    χ_nλ_L  = build_χ_nλ(zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
+                          p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0, μ = μ_L)
+    Σᴸ_nλ_R = build_Σᴸ_nλ(Rλ, zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
+                           p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0, μ = μ_R)
+    Σᴳ_nλ_R = build_Σᴳ_nλ(Rλ, zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
+                           p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0, μ = μ_R)
+    χ_nλ_R  = build_χ_nλ(zλ, p_model.Ny, p_model.Nσ, p_model.N_orb,
+                          p_model.N_λ1, p_model.N_λ2; β = β, γ = 1.0, μ = μ_R)
 
     ξ_anR = build_ξ_an(p_model.Nx, p_model.Ny, p_model.Nσ, p_model.N_orb;
                        xcol = p_model.Nx, y_coup = 1:p_model.Ny)
@@ -52,11 +61,11 @@ function init_params_blocks(;Nx::Int=50, Ny::Int=2, Nσ::Int=2, N_orb::Int=1,
                        xcol = 1, y_coup = 1:p_model.Ny)
 
     left_block = SelfEnergyBlock(:left, p_model.Nc, p_model.N_λ1, p_model.N_λ2,
-                                 Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL)
+                                 Σᴸ_nλ_L, Σᴳ_nλ_L, χ_nλ_L, ξ_anL)
     right_block = SelfEnergyBlock(:right, p_model.Nc, p_model.N_λ1, p_model.N_λ2,
-                                  Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR)
+                                  Σᴸ_nλ_R, Σᴳ_nλ_R, χ_nλ_R, ξ_anR)
     blocks = [left_block, right_block]
-    Δ_blocks = ComplexF64[0.5 + 0.0im, -0.5 + 0.0im]
+    Δ_blocks = ComplexF64[0.0, 0.0]   # no additional AC bias
 
     p_model.H_ab .= H_ab
     p_model.H0_ab .= H_ab

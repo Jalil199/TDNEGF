@@ -37,7 +37,7 @@ module TDNEGF
     # functions from poles.jl"
     export load_poles_square
     # functions from  stationary.jl
-    export ρ_eq
+    export ρ_eq, transmission_std, landauer_conductance
      
     
 end # end module TDNEGF
