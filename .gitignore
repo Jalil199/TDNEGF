@@ -1,0 +1,12 @@
+# Jupyter checkpoints
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Julia temporary/runtime files
+*.ji
+*.cov
+*.mem
+
+# OS/editor noise
+.DS_Store
+*~
