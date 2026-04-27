@@ -534,7 +534,7 @@ function ExperimentalBlockRHSParams(
         obs_N_sites = 0,
         obs_N_loc = 0,
         obs_σ_x = SMatrix{2,2,Float64,4}(0.0, 1.0, 1.0, 0.0),
-        obs_σ_y = SMatrix{2,2,ComplexF64,4}(0.0 + 0.0im, -1im, 1im, 0.0 + 0.0im),
+        obs_σ_y = SMatrix{2,2,ComplexF64,4}(0.0 + 0.0im, 1im, -1im, 0.0 + 0.0im),
         obs_σ_z = SMatrix{2,2,Float64,4}(1.0, 0.0, 0.0, -1.0),
         obs_site_ranges = UnitRange{Int}[]
     )
@@ -603,7 +603,7 @@ problem-level object alongside `Δ_blocks`.
                             j_sd::Float64;
                             Ny::Int,
                             σx::SMatrix{2,2,Float64,4}=SMatrix{2,2,Float64,4}(0.0, 1.0, 1.0, 0.0),
-                            σy::SMatrix{2,2,ComplexF64,4}=SMatrix{2,2,ComplexF64,4}(0.0 + 0.0im, -1im, 1im, 0.0 + 0.0im),
+                            σy::SMatrix{2,2,ComplexF64,4}=SMatrix{2,2,ComplexF64,4}(0.0 + 0.0im, 1im, -1im, 0.0 + 0.0im),
                             σz::SMatrix{2,2,Float64,4}=SMatrix{2,2,Float64,4}(1.0, 0.0, 0.0, -1.0))
     H = p.H_ab
     @assert size(H, 1) == size(H0, 1) == size(H0, 2) "H/H0 dimensions must match"
