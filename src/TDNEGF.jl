@@ -1,7 +1,6 @@
 module TDNEGF
 
     using LinearAlgebra
-    using DifferentialEquations
     using DelimitedFiles
     using StaticArrays
     ⊗(A,B) = kron(A,B) ;
