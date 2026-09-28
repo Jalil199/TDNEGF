@@ -80,22 +80,15 @@ end
 function spindensity_eq(H, eq_var,global_var)#(vm_a1x, energy; t,Temp,jsd=1.0, solver = solver)
     """ This function computes the spin density in equilirbrium 
     """
-    # if solver == "ozaki"
-    # ## The ozaki calculation should be improved 
-    # ## rho = rho_ozaki(green,energy, t, vm_a1x, Temp,jsd)
-    # elseif solver == "denis"
     rho = rho_denis(H, eq_var,global_var)#(energy, t, vm_a1x, Temp,jsd)
-    #end
-    # params_sden = Dict( "sden" => true, "scurr"=>false
-    #                 , "curr"=>false, "rho"=>false,"cden"=>false ,"bcurr" =>false )
-    #spin_eq = Observables(rho, params_sden, true)["sden"]
     ### Initiallize the vectors to calculate the espin densiy. Note that this can be improved in the future
     sden_xab::Array{ComplexF64,3} = zeros(ComplexF64, 3,2*global_var.n,2*global_var.n) ;
-    sden_xa1::Array{Float64,2} = zeros(Float64, 3, global_var.n); 
+    sden_a1x::Array{Float64,2} = zeros(Float64, global_var.n, 3); 
     @tullio sden_xab[x,a,b] = rho[a,c]*global_var.σ_abx[c,b,x]              
-    @tullio sden_xa1[x,a1] = real(sden_xab[x,2a1-1,2a1-1] + sden_xab[x,2a1,2a1])
-    spin_eq = [sden_xa1[:, i] for i in 1:global_var.n :: Int]
-    return  spin_eq
+    @tullio sden_a1x[a1,x] = real(sden_xab[x,2a1-1,2a1-1] + sden_xab[x,2a1,2a1])
+    #spin_eq = [sden_xa1[:, i] for i in 1:global_var.n :: Int]
+    return  sden_a1x#spin_eq
+    #### FIrst a1 later x
 end
 
 function cden_eq(H, eq_var,global_var)
@@ -104,30 +97,32 @@ function cden_eq(H, eq_var,global_var)
     for i in range(1, global_var.n)
         cden[i] = real(tr(rho_eq[2*i-1:2*i, 2*i-1:2*i]))
     end
-    cden = real(cden)
+    #cden = real(cden)
     return cden
 end
+#### The bond currents should be improved
 
-function bcurrs_eq(H, eq_var,global_var)
-    cc  = zeros(Float64, global_var.n-1)
-    cx = zeros(Float64, global_var.n-1)
-    cy = zeros(Float64, global_var.n-1)
-    cz = zeros(Float64, global_var.n-1)
-    rho_eq = rho_denis(H, eq_var,global_var)
-    for i in range(1,global_var.n-1)
-    cc_m = -2*pi*im*(rho_eq[2*i-1:2*i, 2*i+1:2*i+2]*H[2*i+1:2*i+2, 2*i-1:2*i] 
-            - rho_eq[2*i+1:2*i+2, 2*i-1:2*i]*H[2*i-1:2*i, 2*i+1:2*i+2] )
-    cc[i] =real(tr(cc_m))
-    cx[i] =real(tr(global_var.σ_x*cc_m))  
-    cy[i] =real(tr(global_var.σ_y*cc_m)) 
-    cz[i] =real(tr(global_var.σ_z*cc_m))  
-    end
-    bcurrs = real([cc, cx, cy, cz ])
-    return bcurrs
-end
-
+# function bcurrs_eq(H, eq_var,global_var)
+#     cc  = zeros(Float64, global_var.n-1)
+#     cx = zeros(Float64, global_var.n-1)
+#     cy = zeros(Float64, global_var.n-1)
+#     cz = zeros(Float64, global_var.n-1)
+#     rho_eq = rho_denis(H, eq_var,global_var)
+#     for i in range(1,global_var.n-1)
+#     cc_m = -2*pi*im*(rho_eq[2*i-1:2*i, 2*i+1:2*i+2]*H[2*i+1:2*i+2, 2*i-1:2*i] 
+#             - rho_eq[2*i+1:2*i+2, 2*i-1:2*i]*H[2*i-1:2*i, 2*i+1:2*i+2] )
+#     cc[i] =real(tr(cc_m))
+#     cx[i] =real(tr(global_var.σ_x*cc_m))  
+#     cy[i] =real(tr(global_var.σ_y*cc_m)) 
+#     cz[i] =real(tr(global_var.σ_z*cc_m))  
+#     end
+#     bcurrs = real([cc, cx, cy, cz ])
+#     return bcurrs
+# end
+#### 
 
 ### Denis density matrix functions
+
 
 function adjust!(eq_var)#(temp_im,mu_re,mu)
     """ This function modifies temp_im and mu_re in order 
