@@ -691,8 +691,8 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
         end
 
         for n in 1:Nc_i
-            for λ1 in 1:N_λ1_i
-                fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
+            Threads.@threads for λ1 in 1:N_λ1_i           # independent (n, λ1) outputs
+                tmp_Ψ = zeros(ComplexF64, Ns)
 
                 for j in eachindex(p.blocks)
                     block_j = p.blocks[j]
@@ -715,20 +715,20 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
                         ξ_np = @view block_j.ξ_an[:, n_p]
                         @simd for a in 1:Ns
-                            p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
+                            tmp_Ψ[a] += coeff * ξ_np[a]
                         end
                     end
                 end
 
                 dΨ = @view dΨ_i[:, n, λ1]
                 @simd for a in 1:Ns
-                    dΨ[a] += p.tmp_Ψ_vec[a]
+                    dΨ[a] += tmp_Ψ[a]
                 end
             end
 
-            for λ2 in 1:N_λ2_i
+            Threads.@threads for λ2 in 1:N_λ2_i
                 λ = N_λ1_i + λ2
-                fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
+                tmp_Ψ = zeros(ComplexF64, Ns)
 
                 for j in eachindex(p.blocks)
                     block_j = p.blocks[j]
@@ -746,14 +746,14 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
                         ξ_np = @view block_j.ξ_an[:, n_p]
                         @simd for a in 1:Ns
-                            p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
+                            tmp_Ψ[a] += coeff * ξ_np[a]
                         end
                     end
                 end
 
                 dΨ = @view dΨ_i[:, n, λ]
                 @simd for a in 1:Ns
-                    dΨ[a] += p.tmp_Ψ_vec[a]
+                    dΨ[a] += tmp_Ψ[a]
                 end
             end
         end
@@ -769,8 +769,6 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
         χ′_i = p.χ′[i]
         Γ′_i = p.Γ′[i]
-        dot1 = p.tmp_λ1[i]
-        dot3 = p.tmp_λ2[i]
 
         for j in eachindex(p.blocks)
             block_j = p.blocks[j]
@@ -790,13 +788,18 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
 
             χ_j = block_j.χ_nλ
             Γ_j = p.Γ[j]
-            dot2 = p.tmp_λ1p[j]
-            dot4 = p.tmp_λ2p[j]
 
-            for n in 1:Nc_i
+            # Each (n, n_p) channel pair writes a disjoint slice of dΩ: parallel over pairs, thread-local buffers.
+            Threads.@threads for pair in 0:(Nc_i * Nc_j - 1)
+                n = pair ÷ Nc_j + 1
+                n_p = pair % Nc_j + 1
                 ξ_i_n = @view block_i.ξ_an[:, n]
-                for n_p in 1:Nc_j
-                    ξ_j_np = @view block_j.ξ_an[:, n_p]
+                ξ_j_np = @view block_j.ξ_an[:, n_p]
+                dot1 = Vector{ComplexF64}(undef, N_λ1_i)
+                dot2 = Vector{ComplexF64}(undef, N_λ1_j)
+                dot3 = Vector{ComplexF64}(undef, N_λ2_i)
+                dot4 = Vector{ComplexF64}(undef, N_λ2_j)
+                begin
 
                     for λ1 in 1:N_λ1_i
                         dot1[λ1] = dot(ξ_j_np, @view Ψ_i[:, n, λ1])
