@@ -181,7 +181,7 @@ The first run takes a few minutes, most of it spent on compilation.
 | `β` | Inverse temperature of the leads, in units of $`1/\gamma`$ |
 | `μ` | Chemical potential of a lead |
 | `E_F`, `δV` | Fermi energy and bias; the leads sit at $`E_F \pm \delta V/2`$ |
-| `N_λ1` | Spectral poles of the lead self-energy (49: semicircle fit, 31: Lorentzian fit) |
+| `N_λ1` | Spectral poles of the lead self-energy; with `load_poles_square(N_λ1, N_λ2; name)`, `name = "Semicircle"` (minimal pole fit, 49) or `"Lorentz"` (Lorentzian fit, 31) |
 | `N_λ2` | Padé poles of the Fermi function |
 | `xcol`, `y_coup` | Device column and rows to which a lead is attached |
 | `Δ_blocks` | Rigid energy shift of each lead block (for AC or time-dependent bias) |
@@ -237,7 +237,11 @@ python tools/fit_lorentzians.py table my_dos.txt --K 40 --name MyLead
 ```
 
 ```julia
-Rλ, zλ = load_poles_files("data/z_MyLead_N40.txt", "data/R_MyLead_N40.txt")
+# Tables in data/ are selected by name and number of poles
+Rλ, zλ = load_poles_square(40, 20; name = "MyLead")                 # minimal pole fit
+Rλ, zλ = load_poles_square(40, 20; name = "MyLeadLorentz")          # Lorentzian fit
+# Spectral poles only, from any location
+Rλ1, zλ1 = load_poles_files("path/z_MyLead_N40.txt", "path/R_MyLead_N40.txt")
 ```
 
 The fitted $`\Gamma(\omega)`$ must be non-negative on the whole real axis.

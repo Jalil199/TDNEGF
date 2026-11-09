@@ -27,14 +27,14 @@ function _load_precomputed_complex_table(path::AbstractString)
     return complex.(data[:, 1], data[:, 2])
 end
 
-function _load_λ1_square_data(N_λ1::Int; name::AbstractString = "Semicircle")
+# Tables whose residues are stored already multiplied by 2π (legacy Lorentzian fit).
+const _PREFACTORED_TABLES = ("Lorentz",)
+
+function _load_λ1_square_data(N_λ1::Int; name::Union{Nothing,AbstractString} = nothing)
     path = joinpath(dirname(@__DIR__), "data")
-    if N_λ1 == 31 && name == "Semicircle"
-        # Legacy Lorentzian fit; residues are stored without the 2π factor.
-        zλ1 = _load_precomputed_complex_table(joinpath(path, "z_Lorentz_N31.txt"))
-        Rλ1 = _load_precomputed_complex_table(joinpath(path, "R_Lorentz_N31.txt"))
-        return Rλ1, zλ1
-    end
+    # Backward compatibility: without a name, N_λ1 = 31 means the legacy Lorentzian
+    # table and anything else the minimal-pole semicircle tables.
+    name === nothing && (name = N_λ1 == 31 ? "Lorentz" : "Semicircle")
     z_path = joinpath(path, "z_$(name)_N$(N_λ1).txt")
     r_path = joinpath(path, "R_$(name)_N$(N_λ1).txt")
     if !(isfile(z_path) && isfile(r_path))
@@ -42,9 +42,11 @@ function _load_λ1_square_data(N_λ1::Int; name::AbstractString = "Semicircle")
                                  for m in (match(r"^z_(.+)_N(\d+)\.txt$", f),) if m !== nothing]))
         throw(ArgumentError("No pole table for $(name) with N_λ1=$(N_λ1) in $(path). " *
                             "Available: $(join(available, ", ")). " *
-                            "Generate one with tools/generate_poles.py."))
+                            "Generate one with tools/generate_poles.py (minimal pole method) " *
+                            "or tools/fit_lorentzians.py (Lorentzians)."))
     end
-    return load_poles_files(z_path, r_path)
+    scale = name in _PREFACTORED_TABLES ? 1.0 : 2pi
+    return load_poles_files(z_path, r_path; residue_scale = scale)
 end
 
 """
@@ -63,14 +65,24 @@ function load_poles_files(z_path::AbstractString, R_path::AbstractString; residu
 end
 
 """
-    load_poles_square(N_λ1 = 49, N_λ2 = 20; name = "Semicircle")
+    load_poles_square(N_λ1 = 49, N_λ2 = 20; name = nothing)
 
-Spectral poles for a square-lattice lead plus `N_λ2` Padé poles of the Fermi
-function. The spectral table `data/z_<name>_N<N_λ1>.txt` / `R_<name>_N<N_λ1>.txt`
-must exist (generate new ones with `tools/generate_poles.py`); `N_λ1 = 31` with
-the default name loads the legacy Lorentzian fit. Returns `(Rλ, zλ)`.
+Spectral poles of the lead plus `N_λ2` Padé poles of the Fermi function.
+Returns `(Rλ, zλ)`.
+
+The spectral table is `data/z_<name>_N<N_λ1>.txt` / `R_<name>_N<N_λ1>.txt`, so
+`name` selects the fit:
+
+- `"Semicircle"`: minimal pole method (`tools/generate_poles.py`), e.g. N_λ1 = 49;
+- `"Lorentz"`: legacy sum of Lorentzians, N_λ1 = 31;
+- `"SemicircleLorentz"` or any other name: tables written by
+  `tools/generate_poles.py` or `tools/fit_lorentzians.py`.
+
+Without `name`, N_λ1 = 31 loads `"Lorentz"` and any other N_λ1 loads
+`"Semicircle"` (the behavior of earlier versions). Tables outside `data/` are
+loaded with [`load_poles_files`](@ref).
 """
-function load_poles_square(N_λ1::Int = 49, N_λ2::Int = 20; name::AbstractString = "Semicircle")
+function load_poles_square(N_λ1::Int = 49, N_λ2::Int = 20; name::Union{Nothing,AbstractString} = nothing)
     zλ2, Rλ2 = pade_poles(N_λ2)
     Rλ1, zλ1 = _load_λ1_square_data(N_λ1; name)
     return [Rλ1; Rλ2], [zλ1; zλ2]
