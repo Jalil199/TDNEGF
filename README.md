@@ -68,7 +68,7 @@ They obey [1, 2]
 Only the spectral–spectral, spectral–Fermi, and Fermi–spectral sectors of
 $`\Omega`$ are propagated.
 Non-Hermitian baths can optionally be included through a phenomenological
-$`-\tfrac12\{\Gamma_{\text{bath}},\rho\}`$ term in $`\dot\rho`$.
+$`-\frac{1}{2}\{\Gamma_{\mathrm{bath}},\rho\}`$ term in $`\dot\rho`$.
 
 ## Observables
 
@@ -76,10 +76,10 @@ All observables follow from the state at time $`t`$:
 
 | Quantity | Expression | Function |
 |---|---|---|
-| Site charge density | $`n_i = \sum_{a\in i}\operatorname{Re}\rho_{aa}`$ | `obs_n_i!` |
-| Site spin density | $`\langle\sigma^{x,y,z}_i\rangle = \operatorname{Re}\operatorname{Tr}[\sigma^{x,y,z}\rho_{ii}]`$ | `obs_σ_i!` |
-| Charge current of lead $`\alpha`$ | $`I_\alpha = 2\operatorname{Re}\operatorname{Tr}\,\Pi_\alpha`$ | `obs_Ixα!` |
-| Spin current of lead $`\alpha`$ | $`I^{x,y,z}_\alpha = 2\operatorname{Re}\operatorname{Tr}[\sigma^{x,y,z}\Pi_\alpha]`$ | `obs_Ixα!` |
+| Site charge density | $`n_i = \sum_{a\in i}\mathrm{Re}\,\rho_{aa}`$ | `obs_n_i!` |
+| Site spin density | $`\langle\sigma^{x,y,z}_i\rangle = \mathrm{Re}\,\mathrm{Tr}[\sigma^{x,y,z}\rho_{ii}]`$ | `obs_σ_i!` |
+| Charge current of lead $`\alpha`$ | $`I_\alpha = 2\mathrm{Re}\,\mathrm{Tr}\,\Pi_\alpha`$ | `obs_Ixα!` |
+| Spin current of lead $`\alpha`$ | $`I^{x,y,z}_\alpha = 2\mathrm{Re}\,\mathrm{Tr}[\sigma^{x,y,z}\Pi_\alpha]`$ | `obs_Ixα!` |
 
 ## Conventions
 
