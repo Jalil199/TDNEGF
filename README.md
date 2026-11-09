@@ -9,7 +9,8 @@ response is essential: switching on a bias, light pulses, spin and charge pumpin
 or electrons coupled self-consistently to classical magnetization
 dynamics [3].
 
-The method is exact for noninteracting electrons and does not require
+For noninteracting electrons the method is exact up to the accuracy of the
+pole expansion, and it does not require
 two-time Green's functions. Expanding the lead self-energies in poles turns the
 Kadanoff–Baym equations into a closed set of first-order ODEs for single-time
 quantities, which are integrated with the solvers of DifferentialEquations.jl.
@@ -17,84 +18,84 @@ quantities, which are integrated with the solvers of DifferentialEquations.jl.
 ## Physical model
 
 The system consists of a device region described by a tight-binding Hamiltonian
-$H(t)$, with orbital, spin, and site degrees of freedom $a, b$, coupled to
-leads $\alpha$. Each lead couples to the device through a set of channels $n$
-with coupling vectors $\xi_{n\alpha}$ and can be rigidly shifted in energy by
-$\Delta_\alpha(t)$, which is how a (possibly time-dependent) bias is applied.
+$`H(t)`$, with orbital, spin, and site degrees of freedom $`a, b`$, coupled to
+leads $`\alpha`$. Each lead couples to the device through a set of channels $`n`$
+with coupling vectors $`\xi_{n\alpha}`$ and can be rigidly shifted in energy by
+$`\Delta_\alpha(t)`$, which is how a (possibly time-dependent) bias is applied.
 
 The lesser and greater lead self-energies are approximated by a finite sum of
-exponentials in $t - t'$. Two kinds of poles $\lambda$ enter that sum:
+exponentials in $`t - t'`$. Two kinds of poles $`\lambda`$ enter that sum:
 
 - **spectral poles**, which come from fitting the lead density of states
   (for example a Lorentzian fit with 31 poles, or a 49-pole semicircular fit
   obtained with the minimal pole method [4, 5]), and
-- **Fermi poles**, which come from a Padé/Ozaki expansion of the Fermi function
-  at inverse temperature $\beta$.
+- **Fermi poles**, which come from a Padé expansion of the Fermi function
+  at inverse temperature $`\beta`$.
 
-Each pole carries a complex frequency $\chi_{n\lambda\alpha}$ and residues
-$\Sigma^{<}_{n\lambda\alpha}$ and $\Sigma^{>}_{n\lambda\alpha}$, with
-$\Gamma_{n\lambda\alpha} = i(\Sigma^{>}_{n\lambda\alpha} - \Sigma^{<}_{n\lambda\alpha})$.
+Each pole carries a complex frequency $`\chi_{n\lambda\alpha}`$ and residues
+$`\Sigma^{<}_{n\lambda\alpha}`$ and $`\Sigma^{>}_{n\lambda\alpha}`$, with
+$`\Gamma_{n\lambda\alpha} = i(\Sigma^{>}_{n\lambda\alpha} - \Sigma^{<}_{n\lambda\alpha})`$.
 
 ## Equations of motion
 
-With $\hbar = 1$, the propagated state is the single-particle density matrix
-$\rho(t)$ of the device together with two sets of auxiliary modes: vectors
-$\Psi_{n\lambda\alpha}(t)$ and matrices $\Omega_{n\lambda\alpha,\,n'\lambda'\alpha'}(t)$.
+With $`\hbar = 1`$, the propagated state is the single-particle density matrix
+$`\rho(t)`$ of the device together with two sets of auxiliary modes: vectors
+$`\Psi_{n\lambda\alpha}(t)`$ and matrices $`\Omega_{n\lambda\alpha,\,n'\lambda'\alpha'}(t)`$.
 They obey [1, 2]
 
-$$
+```math
 \dot\rho = -i[H,\rho] + \left(\Pi + \Pi^\dagger\right),
 \qquad
 \Pi = \sum_{n\lambda\alpha} \Psi_{n\lambda\alpha}\, \xi_{n\alpha}^{T},
-$$
+```
 
-$$
+```math
 \dot\Psi_{n\lambda\alpha} = -iH\Psi_{n\lambda\alpha}
  + i\left(\chi^{*}_{n\lambda\alpha} + \Delta_\alpha\right)\Psi_{n\lambda\alpha}
  + i\,\Sigma^{<*}_{n\lambda\alpha}\,\xi_{n\alpha}
  - \Gamma^{*}_{n\lambda\alpha}\,\rho\,\xi_{n\alpha}
  - i\sum_{n'\lambda'\alpha'} \Omega_{n\lambda\alpha,\,n'\lambda'\alpha'}\,\xi_{n'\alpha'},
-$$
+```
 
-$$
+```math
 \dot\Omega_{n\lambda\alpha,\,n'\lambda'\alpha'} =
  -i\,\Gamma_{n'\lambda'\alpha'}\,\xi_{n'\alpha'}^{\dagger}\Psi_{n\lambda\alpha}
  -i\,\Gamma^{*}_{n\lambda\alpha}\,\Psi_{n'\lambda'\alpha'}^{\dagger}\xi_{n\alpha}
  -i\left(\chi_{n'\lambda'\alpha'} + \Delta_{\alpha'} - \chi^{*}_{n\lambda\alpha} - \Delta_\alpha\right)
  \Omega_{n\lambda\alpha,\,n'\lambda'\alpha'} .
-$$
+```
 
 Only the spectral–spectral, spectral–Fermi, and Fermi–spectral sectors of
-$\Omega$ are propagated, since the Fermi–Fermi block does not contribute.
+$`\Omega`$ are propagated.
 Non-Hermitian baths can optionally be included through a phenomenological
-$-\tfrac12\{\Gamma_{\text{bath}},\rho\}$ term in $\dot\rho$.
+$`-\tfrac12\{\Gamma_{\text{bath}},\rho\}`$ term in $`\dot\rho`$.
 
 ## Observables
 
-All observables follow from the state at time $t$:
+All observables follow from the state at time $`t`$:
 
 | Quantity | Expression | Function |
 |---|---|---|
-| Site charge density | $n_i = \sum_{a\in i}\operatorname{Re}\rho_{aa}$ | `obs_n_i!` |
-| Site spin density | $\langle\sigma^{x,y,z}_i\rangle = \operatorname{Re}\operatorname{Tr}[\sigma^{x,y,z}\rho_{ii}]$ | `obs_σ_i!` |
-| Charge current into lead $\alpha$ | $I_\alpha = 2\operatorname{Re}\operatorname{Tr}\,\Pi_\alpha$ | `obs_Ixα!` |
-| Spin current into lead $\alpha$ | $I^{x,y,z}_\alpha = 2\operatorname{Re}\operatorname{Tr}[\sigma^{x,y,z}\Pi_\alpha]$ | `obs_Ixα!` |
+| Site charge density | $`n_i = \sum_{a\in i}\operatorname{Re}\rho_{aa}`$ | `obs_n_i!` |
+| Site spin density | $`\langle\sigma^{x,y,z}_i\rangle = \operatorname{Re}\operatorname{Tr}[\sigma^{x,y,z}\rho_{ii}]`$ | `obs_σ_i!` |
+| Charge current of lead $`\alpha`$ | $`I_\alpha = 2\operatorname{Re}\operatorname{Tr}\,\Pi_\alpha`$ | `obs_Ixα!` |
+| Spin current of lead $`\alpha`$ | $`I^{x,y,z}_\alpha = 2\operatorname{Re}\operatorname{Tr}[\sigma^{x,y,z}\Pi_\alpha]`$ | `obs_Ixα!` |
 
 ## Conventions
 
-- Units: $\hbar = 1$. Energies are in units of the hopping $\gamma$ and times in
-  units of $\hbar/\gamma$.
+- Units: $`\hbar = 1`$. Energies are in units of the hopping $`\gamma`$ and times in
+  units of $`\hbar/\gamma`$.
 - **Bias.** A bias must be applied exactly once: either through the chemical
-  potentials $\mu_\alpha$ in the self-energy and Fermi-pole coefficients, or
-  through a common $\mu = E_F$ together with lead shifts
-  $\Delta_\alpha = \pm V/2$. Combining both doubles the effective bias.
+  potentials $`\mu_\alpha`$ in the self-energy and Fermi-pole coefficients, or
+  through a common $`\mu = E_F`$ together with lead shifts
+  $`\Delta_\alpha = \pm V/2`$. Combining both doubles the effective bias.
 - In the block backend, currents are indexed by auxiliary block
   (`p_blocks.blocks`). They match physical leads only when each lead is a single
   block.
 
 ## Installation
 
-Requires Julia 1.10 or newer.
+Requires Julia 1.11 or newer.
 
 ```julia
 using Pkg
@@ -105,42 +106,103 @@ For development from a local clone, use `Pkg.develop(path="/path/to/TDNEGF")`.
 
 ## Quick start
 
-This is a two-terminal square-lattice wire with Rashba spin–orbit coupling and a
-bias across the leads. Building the pole tensors takes a few more lines; see
-`examples/01_two_terminal_square_lattice.jl` for the complete setup.
+The script below is self-contained. It drives a clean two-terminal wire with a
+small DC bias, propagates it to the steady state, and compares the resulting
+conductance with the Landauer formula. At $`E_F = 0`$ the wire has four open
+channels (two transverse modes × two spins), so both values should be
+$`4\,e^2/h`$.
 
 ```julia
 using TDNEGF
 using DifferentialEquations
 
-# Device: 6×2 square lattice, spin-1/2, one orbital per site
-p_model = ModelParamsTDNEGF(Nx=6, Ny=2, Nσ=2, N_orb=1, Nα=2, N_λ1=49, N_λ2=20)
-H_ab = build_H_ab(; Nx=p_model.Nx, Ny=p_model.Ny, Nσ=p_model.Nσ, N_orb=p_model.N_orb,
-                  γ=1.0, γso=0.5 + 0im)
-p_model.H_ab .= H_ab
-p_model.H0_ab .= H_ab
+# Device: clean 4×2 square-lattice wire, spin-1/2, one orbital per site
+Nx, Ny, Nσ, N_orb = 4, 2, 2, 1
+N_λ1, N_λ2 = 49, 20          # spectral poles (semicircle fit) + Padé Fermi poles
+β  = 40.0                    # inverse temperature (1/γ)
+E_F, δV = 0.0, 0.01          # Fermi energy and small DC bias
 
-# Leads: one self-energy block each, shifted by ±V/2
-#   (Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL, ξ_anR built as in examples/01_...)
-left  = SelfEnergyBlock(:left,  p_model.Nc, p_model.N_λ1, p_model.N_λ2, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anL)
-right = SelfEnergyBlock(:right, p_model.Nc, p_model.N_λ1, p_model.N_λ2, Σᴸ_nλ, Σᴳ_nλ, χ_nλ, ξ_anR)
-Δ_blocks = ComplexF64[+0.5, -0.5]
+p_model = ModelParamsTDNEGF(Nx=Nx, Ny=Ny, Nσ=Nσ, N_orb=N_orb, Nα=2, N_λ1=N_λ1, N_λ2=N_λ2)
+p_model.H_ab .= build_H_ab(; Nx, Ny, Nσ, N_orb, γ=1.0, γso=0.0 + 0im)
 
-# Propagate from the empty state
-p_blocks = ExperimentalBlockRHSParams(p_model.H_ab, [left, right], Δ_blocks, p_model)
-u0 = zeros(ComplexF64, p_blocks.dims_ρ_ab[1]^2 + p_blocks.aux_layout.total_size)
+# Leads: one self-energy block per lead, each at its own chemical potential
+Rλ, zλ = load_poles_square(N_λ1, N_λ2)
+function lead_block(name, μ, xcol)
+    Σᴸ = build_Σᴸ_nλ(Rλ, zλ, Ny, Nσ, N_orb, N_λ1, N_λ2; β, γ=1.0, μ)
+    Σᴳ = build_Σᴳ_nλ(Rλ, zλ, Ny, Nσ, N_orb, N_λ1, N_λ2; β, γ=1.0, μ)
+    χ  = build_χ_nλ(zλ, Ny, Nσ, N_orb, N_λ1, N_λ2; β, γ=1.0, μ)
+    ξ  = build_ξ_an(Nx, Ny, Nσ, N_orb; xcol, y_coup=1:Ny)
+    return SelfEnergyBlock(name, p_model.Nc, N_λ1, N_λ2, Σᴸ, Σᴳ, χ, ξ)
+end
+blocks   = [lead_block(:left, E_F + δV/2, 1), lead_block(:right, E_F - δV/2, Nx)]
+Δ_blocks = ComplexF64[0, 0]  # bias already in μ_α; apply it only once
 
-prob = ODEProblem(eom_tdnegf_blocks!, u0, (0.0, 10.0), p_blocks)
-sol  = solve(prob, Vern7(); reltol=1e-6, abstol=1e-8, dense=false)
+# Propagate from the empty device until the current is stationary
+p = ExperimentalBlockRHSParams(p_model.H_ab, blocks, Δ_blocks, p_model)
+u0 = zeros(ComplexF64, p.dims_ρ_ab[1]^2 + p.aux_layout.total_size)
+sol = solve(ODEProblem(eom_tdnegf_blocks!, u0, (0.0, 200.0), p), Vern7();
+            reltol=1e-8, abstol=1e-10, saveat=1.0)
+
+# Observables along the trajectory
+obs = ObservablesTDNEGF(p_model; N_tmax=length(sol.t), N_leads=length(blocks))
+for (it, ut) in enumerate(sol.u)
+    obs.idx = it
+    ptr = pointer_blocks(ut, p.dims_ρ_ab, p.aux_layout)
+    obs_n_i!(ptr, p_model, obs)
+    obs_Ixα!(ptr, p, obs)
+end
+
+# Steady state: conductance in units of e²/h, compared with Landauer
+G_tdnegf = 2π * obs.Iα[1, end] / δV
+G_landauer = 2π * landauer_conductance(E_F; δV, β, Nx, Ny, Nσ, N_orb)
+println("G (TDNEGF)   = ", round(G_tdnegf; digits=4), " e²/h")
+println("G (Landauer) = ", round(G_landauer; digits=4), " e²/h")
 ```
 
-Observables are evaluated by obtaining views of $\rho$, $\Psi$, and $\Omega$
-for each saved state with `pointer_blocks(...)` and passing them to the
-`obs_*` routines.
+Expected output:
 
-Because $H$ and $\Delta_\alpha$ live in the parameter object, time-dependent
-drives are implemented by updating `p_blocks.H_ab` or `p_blocks.Δ_blocks`
-(for example, in a callback) without rebuilding the self-energy blocks.
+```
+G (TDNEGF)   = 4.0 e²/h
+G (Landauer) = 4.0 e²/h
+```
+
+The first run takes a few minutes, most of it spent on compilation.
+
+### Parameters
+
+| Symbol | Meaning |
+|---|---|
+| `Nx`, `Ny` | Device length and width in lattice sites |
+| `Nσ` | Spin components (2 for spin-1/2) |
+| `N_orb` | Orbitals per site |
+| `Nα` | Number of leads |
+| `γ` | Nearest-neighbour hopping; sets the energy unit |
+| `γso` | Rashba spin–orbit hopping |
+| `β` | Inverse temperature of the leads, in units of $`1/\gamma`$ |
+| `μ` | Chemical potential of a lead |
+| `E_F`, `δV` | Fermi energy and bias; the leads sit at $`E_F \pm \delta V/2`$ |
+| `N_λ1` | Spectral poles of the lead self-energy (49: semicircle fit, 31: Lorentzian fit) |
+| `N_λ2` | Padé poles of the Fermi function |
+| `xcol`, `y_coup` | Device column and rows to which a lead is attached |
+| `Δ_blocks` | Rigid energy shift of each lead block (for AC or time-dependent bias) |
+| `reltol`, `abstol` | ODE solver tolerances |
+
+### Outputs
+
+| Field | Meaning |
+|---|---|
+| `obs.t` | Saved times, in units of $`\hbar/\gamma`$ |
+| `obs.n_i[i, t]` | Charge density on site `i` |
+| `obs.σx_i[i, k, t]` | Electronic spin density on site `i`, component `k` = x, y, z |
+| `obs.Iα[α, t]` | Charge current of lead (block) `α`, in units of $`e\gamma/\hbar`$ |
+| `obs.Iαx[α, k, t]` | Spin current of lead (block) `α`, component `k` |
+
+For spin densities, call `obs_σ_i!(ptr, p_model, obs)` inside the loop.
+Because $`H`$ and $`\Delta_\alpha`$ live in the parameter object, time-dependent
+drives are implemented by updating `p.H_ab` or `p.Δ_blocks` (for example, in a
+callback) without rebuilding the self-energy blocks. More complete workflows,
+including spin–orbit coupling and coupling to classical spins, are in
+`examples/`.
 
 ## Implementation
 
@@ -149,7 +211,7 @@ There are two interchangeable implementations of the equations above:
 - **Block backend** (`eom_tdnegf_blocks!`, `ExperimentalBlockRHSParams`,
   `SelfEnergyBlock`). This is the recommended one. Each block can have its own
   number of channels and poles. Static pole data lives in `SelfEnergyBlock`, and
-  dynamic quantities ($H$, $\Delta$) and workspaces live in the parameter object.
+  dynamic quantities ($`H`$, $`\Delta`$) and workspaces live in the parameter object.
   The `Experimental` prefix is historical.
 - **Legacy backend** (`eom_tdnegf!`, `ModelParamsTDNEGF`). It uses a rectangular
   layout with the same number of channels and poles for every lead. It is kept
@@ -159,14 +221,15 @@ Both are in-place right-hand sides that work on preallocated buffers.
 
 ## Validation
 
-- **Stationary limit.** For a clean wire under small DC bias, the long-time
-  current reproduces the Landauer conductance, including quantized steps as
-  $E_F$ crosses subband edges (`test/test_standard_landauer.jl`,
-  `examples/conductance_verification.jl`).
-- **Cross-checks.** The block and legacy backends give the same right-hand side
-  and the same short-time trajectories to $10^{-12}$ (`test/test_eom_tdnegf_blocks.jl`).
-  The legacy N49 benchmark is reproduced in
-  `examples/notebooks/05_legacy_n49_benchmark.ipynb`.
+- **Stationary reference.** `src/stationary.jl` implements the Landauer
+  transmission of the lead–device–lead system, which serves as the reference
+  for the long-time TDNEGF current. Its quantized steps are checked in
+  `test/test_standard_landauer.jl`.
+- **Backend consistency.** The block and legacy backends give the same
+  right-hand side and the same short-time trajectories to within $`10^{-12}`$
+  (`test/test_eom_tdnegf_blocks.jl`).
+- **Legacy benchmark.** `examples/notebooks/05_legacy_n49_benchmark.ipynb`
+  compares the current implementation with the original code.
 
 Run the test suite with `julia --project -e 'using Pkg; Pkg.test()'`.
 
@@ -190,7 +253,6 @@ src/         package source (types, Hamiltonians, self-energies, EOM, observable
 examples/    scripts and notebooks
 test/        unit tests and validation notebooks
 docs/        developer notes: architecture, propagation, observables
-benchmarks/  performance comparisons
 legacy/      original code, kept for reference
 ```
 
