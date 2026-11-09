@@ -27,31 +27,51 @@ function _load_precomputed_complex_table(path::AbstractString)
     return complex.(data[:, 1], data[:, 2])
 end
 
-function _load_λ1_square_data(N_λ1::Int)
+function _load_λ1_square_data(N_λ1::Int; name::AbstractString = "Semicircle")
     path = joinpath(dirname(@__DIR__), "data")
-    if N_λ1 == 49
-        z_path = joinpath(path, "z_Semicircle_N49.txt")
-        r_path = joinpath(path, "R_Semicircle_N49.txt")
-        zλ1 = _load_precomputed_complex_table(z_path)
-        Rλ1 = _load_precomputed_complex_table(r_path) .* (2pi)
-        return Rλ1, zλ1
-    elseif N_λ1 == 31
-        z_path = joinpath(path, "z_Lorentz_N31.txt")
-        r_path = joinpath(path, "R_Lorentz_N31.txt")
-        zλ1 = _load_precomputed_complex_table(z_path)
-        Rλ1 = _load_precomputed_complex_table(r_path)
+    if N_λ1 == 31 && name == "Semicircle"
+        # Legacy Lorentzian fit; residues are stored without the 2π factor.
+        zλ1 = _load_precomputed_complex_table(joinpath(path, "z_Lorentz_N31.txt"))
+        Rλ1 = _load_precomputed_complex_table(joinpath(path, "R_Lorentz_N31.txt"))
         return Rλ1, zλ1
     end
-    throw(ArgumentError("There are not precalculated quantities for N_λ1=$N_λ1"))
+    z_path = joinpath(path, "z_$(name)_N$(N_λ1).txt")
+    r_path = joinpath(path, "R_$(name)_N$(N_λ1).txt")
+    if !(isfile(z_path) && isfile(r_path))
+        available = sort(unique([m.captures[1] * " N=" * m.captures[2] for f in readdir(path)
+                                 for m in (match(r"^z_(.+)_N(\d+)\.txt$", f),) if m !== nothing]))
+        throw(ArgumentError("No pole table for $(name) with N_λ1=$(N_λ1) in $(path). " *
+                            "Available: $(join(available, ", ")). " *
+                            "Generate one with tools/generate_poles.py."))
+    end
+    return load_poles_files(z_path, r_path)
 end
 
-function load_poles_square(N_λ1::Int = 49, N_λ2::Int = 20)
-    ### Calculates the fermi poles 
-    zλ2, Rλ2 = pade_poles(N_λ2)
-    Rλ1, zλ1 = _load_λ1_square_data(N_λ1)
-    Rλ = [Rλ1;  Rλ2]
-    zλ = [zλ1;  zλ2]
-    
-    return Rλ, zλ
+"""
+    load_poles_files(z_path, R_path; residue_scale = 2π)
 
+Load spectral poles `zλ1` and residues `Rλ1` from two-column (real, imag) text
+files written by `tools/generate_poles.py`. Residues are multiplied by
+`residue_scale`; the default 2π converts a fitted spectral function A(ω) into
+Γ(ω) = 2π A(ω). Returns `(Rλ1, zλ1)`.
+"""
+function load_poles_files(z_path::AbstractString, R_path::AbstractString; residue_scale::Real = 2pi)
+    zλ1 = _load_precomputed_complex_table(z_path)
+    Rλ1 = _load_precomputed_complex_table(R_path) .* residue_scale
+    length(zλ1) == length(Rλ1) || throw(ArgumentError("pole and residue tables have different lengths"))
+    return Rλ1, zλ1
+end
+
+"""
+    load_poles_square(N_λ1 = 49, N_λ2 = 20; name = "Semicircle")
+
+Spectral poles for a square-lattice lead plus `N_λ2` Padé poles of the Fermi
+function. The spectral table `data/z_<name>_N<N_λ1>.txt` / `R_<name>_N<N_λ1>.txt`
+must exist (generate new ones with `tools/generate_poles.py`); `N_λ1 = 31` with
+the default name loads the legacy Lorentzian fit. Returns `(Rλ, zλ)`.
+"""
+function load_poles_square(N_λ1::Int = 49, N_λ2::Int = 20; name::AbstractString = "Semicircle")
+    zλ2, Rλ2 = pade_poles(N_λ2)
+    Rλ1, zλ1 = _load_λ1_square_data(N_λ1; name)
+    return [Rλ1; Rλ2], [zλ1; zλ2]
 end

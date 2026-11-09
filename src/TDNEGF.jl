@@ -35,7 +35,7 @@ module TDNEGF
     # functions from observables.jl"
     export ObservablesTDNEGF, obs_s_i!, obs_σ_i!, obs_n_i!,obs_Ixα!, get_sub, obs_σ_i_eq!
     # functions from poles.jl"
-    export load_poles_square
+    export load_poles_square, load_poles_files
     # functions from  stationary.jl
     export ρ_eq, transmission_std, landauer_conductance
      

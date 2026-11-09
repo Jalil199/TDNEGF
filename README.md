@@ -219,6 +219,37 @@ There are two interchangeable implementations of the equations above:
 
 Both are in-place right-hand sides that work on preallocated buffers.
 
+## Pole tables for other leads
+
+The spectral poles are read from `data/z_<name>_N<N>.txt` and
+`data/R_<name>_N<N>.txt`. Two scripts in `tools/` generate them for any lead
+density of states: the built-in semicircle, a two-column file `(ω, A(ω))`, or a
+NumPy expression in `w`.
+
+```bash
+# Minimal pole method [4, 5] (needs MiniPole:
+#   pip install git+https://github.com/Green-Phys/MiniPole.git kneed)
+python tools/generate_poles.py semicircle --M 25
+python tools/generate_poles.py table my_dos.txt --M 40 --name MyLead
+
+# Sum of Lorentzians with non-negative weights (numpy/scipy only)
+python tools/fit_lorentzians.py table my_dos.txt --K 40 --name MyLead
+```
+
+```julia
+Rλ, zλ = load_poles_files("data/z_MyLead_N40.txt", "data/R_MyLead_N40.txt")
+```
+
+The fitted $`\Gamma(\omega)`$ must be non-negative on the whole real axis.
+Otherwise the self-energy is not retarded, and some modes grow slowly instead
+of decaying, which shows up at long times. A sum of Lorentzians satisfies this
+by construction. A minimal-pole fit is much more accurate for the same number
+of poles, but its small fit error oscillates around zero wherever
+$`A(\omega)`$ vanishes. `generate_poles.py` checks the fit on a grid that
+resolves every pole and, if needed, adds one broad positive Lorentzian (one
+extra pole, with a height of the order of the fit error) that makes
+$`\Gamma \ge 0`$ everywhere.
+
 ## Validation
 
 - **Stationary reference.** `src/stationary.jl` implements the Landauer
@@ -251,6 +282,8 @@ All paths are relative to `examples/`.
 ```
 src/         package source (types, Hamiltonians, self-energies, EOM, observables, stationary limit)
 examples/    scripts and notebooks
+data/        pole tables for the lead self-energies
+tools/       pole-table generators (minimal pole method, Lorentzian fit)
 test/        unit tests and validation notebooks
 docs/        developer notes: architecture, propagation, observables
 legacy/      original code, kept for reference
