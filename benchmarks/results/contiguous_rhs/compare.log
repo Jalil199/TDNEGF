@@ -1,0 +1,27 @@
+threads=1
+  nf_20x4: 82 vs 82
+  nf_50x2: 92 vs 92
+  rhs_10x2     rel.err = 4.08e-17
+  rhs_20x4     rel.err = 4.12e-17
+  rhs_50x2     rel.err = 3.76e-17
+  rhs_6x2      rel.err = 4.07e-17
+  solve_20x4   rel.err = 6.06e-16
+  solve_50x2   rel.err = 1.48e-16
+threads=4
+  nf_20x4: 82 vs 82
+  nf_50x2: 92 vs 92
+  rhs_10x2     rel.err = 4.08e-17
+  rhs_20x4     rel.err = 4.12e-17
+  rhs_50x2     rel.err = 3.76e-17
+  rhs_6x2      rel.err = 4.07e-17
+  solve_20x4   rel.err = 6.06e-16
+  solve_50x2   rel.err = 1.48e-16
+threads=8
+  nf_20x4: 82 vs 82
+  nf_50x2: 92 vs 92
+  rhs_10x2     rel.err = 4.08e-17
+  rhs_20x4     rel.err = 4.12e-17
+  rhs_50x2     rel.err = 3.76e-17
+  rhs_6x2      rel.err = 4.07e-17
+  solve_20x4   rel.err = 6.06e-16
+  solve_50x2   rel.err = 1.48e-16
