@@ -412,7 +412,9 @@ from numerical caches:
 - per-block reductions/work arrays (`Ψ_an`, `HΨ`, `ρξ`),
 - conjugated/self-energy coefficients (`χ′`, `Σᴸ′`, `Γ`, `Γ′`),
 - dynamic problem-level ingredients (`H_ab`, `Δ_blocks`),
-- small temporary vectors used inside Ω updates (`tmp_Ψ_vec`, `tmp_λ*`).
+- Ω-sector workspaces: overlaps `ξΨ[j, i] = ξ_j' Ψ_i` and λ′-sums `C_λ1`, `C_λ2`
+  used for the Ψ(Ω) feedback; `thread_min_Ω` sets the Ω-sector size above
+  which the elementwise Ω update is threaded.
 
 These caches mirror repeated operations in the legacy solver while avoiding
 per-RHS allocations.
@@ -442,11 +444,10 @@ Base.@kwdef struct ExperimentalBlockRHSParams
     Σᴸ′::Vector{Matrix{ComplexF64}}
     Γ::Vector{Matrix{ComplexF64}}
     Γ′::Vector{Matrix{ComplexF64}}
-    tmp_Ψ_vec::Vector{ComplexF64}
-    tmp_λ1::Vector{Vector{ComplexF64}}
-    tmp_λ1p::Vector{Vector{ComplexF64}}
-    tmp_λ2::Vector{Vector{ComplexF64}}
-    tmp_λ2p::Vector{Vector{ComplexF64}}
+    ξΨ::Matrix{Matrix{ComplexF64}}
+    C_λ1::Matrix{Matrix{ComplexF64}}
+    C_λ2::Matrix{Matrix{ComplexF64}}
+    thread_min_Ω::Int = 1 << 16
     obs_N_sites::Int
     obs_N_loc::Int
     obs_σ_x::SMatrix{2,2,Float64,4}
@@ -526,11 +527,9 @@ function ExperimentalBlockRHSParams(
         Σᴸ′ = Σᴸ′,
         Γ = Γ,
         Γ′ = Γ′,
-        tmp_Ψ_vec = zeros(ComplexF64, Ns),
-        tmp_λ1 = [zeros(ComplexF64, b.N_λ1) for b in blocks],
-        tmp_λ1p = [zeros(ComplexF64, b.N_λ1) for b in blocks],
-        tmp_λ2 = [zeros(ComplexF64, b.N_λ2) for b in blocks],
-        tmp_λ2p = [zeros(ComplexF64, b.N_λ2) for b in blocks],
+        ξΨ = [zeros(ComplexF64, blocks[j].Nc, blocks[i].Nc * blocks[i].N_λ) for j in 1:nblocks, i in 1:nblocks],
+        C_λ1 = [zeros(ComplexF64, blocks[i].Nc * blocks[i].N_λ1, blocks[j].Nc) for i in 1:nblocks, j in 1:nblocks],
+        C_λ2 = [zeros(ComplexF64, blocks[i].Nc * blocks[i].N_λ2, blocks[j].Nc) for i in 1:nblocks, j in 1:nblocks],
         obs_N_sites = 0,
         obs_N_loc = 0,
         obs_σ_x = SMatrix{2,2,Float64,4}(0.0, 1.0, 1.0, 0.0),
@@ -576,11 +575,10 @@ function ExperimentalBlockRHSParams(
         Σᴸ′ = p.Σᴸ′,
         Γ = p.Γ,
         Γ′ = p.Γ′,
-        tmp_Ψ_vec = p.tmp_Ψ_vec,
-        tmp_λ1 = p.tmp_λ1,
-        tmp_λ1p = p.tmp_λ1p,
-        tmp_λ2 = p.tmp_λ2,
-        tmp_λ2p = p.tmp_λ2p,
+        ξΨ = p.ξΨ,
+        C_λ1 = p.C_λ1,
+        C_λ2 = p.C_λ2,
+        thread_min_Ω = p.thread_min_Ω,
         obs_N_sites = obs_N_sites,
         obs_N_loc = obs_N_loc,
         obs_σ_x = p_obs.σ_x,
@@ -619,6 +617,60 @@ problem-level object alongside `Δ_blocks`.
     return nothing
 end
 
+# dΩ[n, λ, n′, λ′] = -iΓ_j[n′,λ′] ξΨ_ji[n′,(n,λ)] - iΓ′_i[n,λ] conj(ξΨ_ij[n,(n′,λ′)])
+#                    - i(χ_j[n′,λ′] + Δ_j - χ′_i[n,λ] - Δ_i) Ω[n, λ, n′, λ′]
+# λ ranges over `λs_i` (global index into block i), λ′ over `λs_j` (block j).
+@inline function _omega_column!(du, u, off, lp, Nc_i, Nc_j, λs_i, λs_j,
+                                ξΨ_ji, ξΨ_ij, Γ_j, Γ′_i, χ_j, χ′_i, Δ_i, Δ_j)
+    # Ω sector stored contiguously at u[off + 1 : ...] as [n, l, n′, l′].
+    λg_p = λs_j[lp]
+    k = off + (lp - 1) * Nc_i * length(λs_i) * Nc_j
+    @inbounds for n_p in 1:Nc_j
+        Γjp = Γ_j[n_p, λg_p]
+        cj = χ_j[n_p, λg_p] + Δ_j
+        col_ij = n_p + Nc_j * (λg_p - 1)
+        for λg in λs_i
+            col_ji0 = Nc_i * (λg - 1)
+            @simd for n in 1:Nc_i
+                du[k + n] = -1im * Γjp * ξΨ_ji[n_p, n + col_ji0] -
+                            1im * Γ′_i[n, λg] * conj(ξΨ_ij[n, col_ij]) -
+                            1im * (cj - χ′_i[n, λg] - Δ_i) * u[k + n]
+            end
+            k += Nc_i
+        end
+    end
+    return nothing
+end
+
+function _omega_sector!(du, u, range, Nc_i, Nc_j, λs_i, λs_j, ξΨ_ji, ξΨ_ij, Γ_j, Γ′_i, χ_j, χ′_i, Δ_i, Δ_j, thread_min)
+    off = first(range) - 1
+    nlp = length(λs_j)
+    if Threads.nthreads() > 1 && length(range) >= thread_min
+        Threads.@threads :static for lp in 1:nlp
+            _omega_column!(du, u, off, lp, Nc_i, Nc_j, λs_i, λs_j, ξΨ_ji, ξΨ_ij, Γ_j, Γ′_i, χ_j, χ′_i, Δ_i, Δ_j)
+        end
+    else
+        for lp in 1:nlp
+            _omega_column!(du, u, off, lp, Nc_i, Nc_j, λs_i, λs_j, ξΨ_ji, ξΨ_ij, Γ_j, Γ′_i, χ_j, χ′_i, Δ_i, Δ_j)
+        end
+    end
+    return nothing
+end
+
+# c[k] (+)= Σ_l u[off + k + m(l-1)] for k in 1:m, l in 1:nl: sum over the last index
+# of a contiguous m × nl block (faster than gemv on a reshaped view).
+@inline function _sum_last!(c, u, range, m, nl, accumulate::Bool)
+    off = first(range) - 1
+    accumulate || fill!(c, 0.0 + 0.0im)
+    @inbounds for l in 1:nl
+        k0 = off + m * (l - 1)
+        @simd for k in 1:m
+            c[k] += u[k0 + k]
+        end
+    end
+    return nothing
+end
+
 """
     eom_tdnegf_blocks!(du, u, p, t)
 
@@ -628,22 +680,32 @@ State layout matches `pointer_blocks`:
 `u = [vec(ρ_ab); vec(Ψ blocks); vec(Ω pair sectors)]`.
 The equations are the same as the legacy ξ-based path, but applied per block
 and per ordered block pair `(i, j)`.
+
+Ω sectors are traversed in memory order (first index innermost) using flat
+indices into `u`/`du`; the overlaps ξ_j' Ψ_i are computed with one BLAS product
+per block pair. The RHS does not allocate; sectors with at least
+`p.thread_min_Ω` elements are updated with `Threads.@threads`.
 """
 function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::ExperimentalBlockRHSParams, t)
-    # Hot-path optimization: avoid rebuilding pointer container hierarchies on each RHS call.
     ρ_ab = reshape(view(u, 1:p.size_ρ_ab), p.dims_ρ_ab)
     dρ_ab = reshape(view(du, 1:p.size_ρ_ab), p.dims_ρ_ab)
     Ns = p.dims_ρ_ab[1]
+    nb = length(p.blocks)
 
     fill!(p.Π_ab, 0.0 + 0.0im)
 
-    @inbounds for i in eachindex(p.blocks)
+    # Overlaps ξ_j' Ψ_i for every ordered pair, one gemm each.
+    for i in 1:nb
+        Ψ_i_mat = reshape(view(u, p.block_ranges_Ψ[i]), Ns, :)
+        for j in 1:nb
+            mul!(p.ξΨ[j, i], adjoint(p.blocks[j].ξ_an), Ψ_i_mat)
+        end
+    end
+
+    @inbounds for i in 1:nb
         block_i = p.blocks[i]
         Δ_i = p.Δ_blocks[i]
-        Nc_i = block_i.Nc
-        N_λ1_i = block_i.N_λ1
-        N_λ2_i = block_i.N_λ2
-        N_λ_i = block_i.N_λ
+        Nc_i, N_λ1_i, N_λ2_i, N_λ_i = block_i.Nc, block_i.N_λ1, block_i.N_λ2, block_i.N_λ
 
         Ψ_i = reshape(view(u, p.block_ranges_Ψ[i]), (Ns, Nc_i, N_λ_i))
         dΨ_i = reshape(view(du, p.block_ranges_Ψ[i]), (Ns, Nc_i, N_λ_i))
@@ -667,196 +729,48 @@ function eom_tdnegf_blocks!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Ex
         mul!(ρξ_i, ρ_ab, block_i.ξ_an)
         mul!(p.Π_ab, Ψ_an_i, transpose(block_i.ξ_an), 1.0 + 0.0im, 1.0 + 0.0im)
 
-        for n in 1:Nc_i
-            ξ_n = @view block_i.ξ_an[:, n]
-            ρξ_n = @view ρξ_i[:, n]
-
-            for λ in 1:N_λ_i
-                χ′ = χ′_i[n, λ]
-                Σᴸ′ = Σᴸ′_i[n, λ]
-                Γ′ = Γ′_i[n, λ]
-
-                coef_χΨ = 1im * (χ′ + Δ_i)
-                coef_Σξ = 1im * Σᴸ′
-                coef_Γρξ = -Γ′
-
-                dΨ_nλ = @view dΨ_i[:, n, λ]
-                Ψ_nλ = @view Ψ_i[:, n, λ]
-                HΨ_nλ = @view HΨ_i[:, n, λ]
-
-                @simd for a in 1:Ns
-                    dΨ_nλ[a] = -1im * HΨ_nλ[a] + coef_χΨ * Ψ_nλ[a] + coef_Σξ * ξ_n[a] + coef_Γρξ * ρξ_n[a]
-                end
+        for λ in 1:N_λ_i, n in 1:Nc_i
+            coef_χΨ = 1im * (χ′_i[n, λ] + Δ_i)
+            coef_Σξ = 1im * Σᴸ′_i[n, λ]
+            coef_Γρξ = -Γ′_i[n, λ]
+            @simd for a in 1:Ns
+                dΨ_i[a, n, λ] = -1im * HΨ_i[a, n, λ] + coef_χΨ * Ψ_i[a, n, λ] +
+                                coef_Σξ * block_i.ξ_an[a, n] + coef_Γρξ * ρξ_i[a, n]
             end
         end
 
-        for n in 1:Nc_i
-            for λ1 in 1:N_λ1_i
-                fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
-
-                for j in eachindex(p.blocks)
-                    block_j = p.blocks[j]
-                    Nc_j = block_j.Nc
-                    N_λ1_j = block_j.N_λ1
-                    N_λ2_j = block_j.N_λ2
-
-                    Ω11_ij = reshape(view(u, p.pair_ranges_Ω11[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ1_j))
-                    Ω12_ij = reshape(view(u, p.pair_ranges_Ω12[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ2_j))
-
-                    for n_p in 1:Nc_j
-                        coeff = 0.0 + 0.0im
-                        @simd for λ1_p in 1:N_λ1_j
-                            coeff += Ω11_ij[n, λ1, n_p, λ1_p]
-                        end
-                        @simd for λ2_p in 1:N_λ2_j
-                            coeff += Ω12_ij[n, λ1, n_p, λ2_p]
-                        end
-                        coeff *= -1im
-
-                        ξ_np = @view block_j.ξ_an[:, n_p]
-                        @simd for a in 1:Ns
-                            p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
-                        end
-                    end
-                end
-
-                dΨ = @view dΨ_i[:, n, λ1]
-                @simd for a in 1:Ns
-                    dΨ[a] += p.tmp_Ψ_vec[a]
-                end
-            end
-
-            for λ2 in 1:N_λ2_i
-                λ = N_λ1_i + λ2
-                fill!(p.tmp_Ψ_vec, 0.0 + 0.0im)
-
-                for j in eachindex(p.blocks)
-                    block_j = p.blocks[j]
-                    Nc_j = block_j.Nc
-                    N_λ1_j = block_j.N_λ1
-
-                    Ω21_ij = reshape(view(u, p.pair_ranges_Ω21[i, j]), (Nc_i, N_λ2_i, Nc_j, N_λ1_j))
-
-                    for n_p in 1:Nc_j
-                        coeff = 0.0 + 0.0im
-                        @simd for λ1_p in 1:N_λ1_j
-                            coeff += Ω21_ij[n, λ2, n_p, λ1_p]
-                        end
-                        coeff *= -1im
-
-                        ξ_np = @view block_j.ξ_an[:, n_p]
-                        @simd for a in 1:Ns
-                            p.tmp_Ψ_vec[a] += coeff * ξ_np[a]
-                        end
-                    end
-                end
-
-                dΨ = @view dΨ_i[:, n, λ]
-                @simd for a in 1:Ns
-                    dΨ[a] += p.tmp_Ψ_vec[a]
-                end
-            end
-        end
-    end
-
-    @inbounds for i in eachindex(p.blocks)
-        block_i = p.blocks[i]
-        Δ_i = p.Δ_blocks[i]
-        Nc_i = block_i.Nc
-        N_λ1_i = block_i.N_λ1
-        N_λ2_i = block_i.N_λ2
-        Ψ_i = reshape(view(u, p.block_ranges_Ψ[i]), (Ns, Nc_i, block_i.N_λ))
-
-        χ′_i = p.χ′[i]
-        Γ′_i = p.Γ′[i]
-        dot1 = p.tmp_λ1[i]
-        dot3 = p.tmp_λ2[i]
-
-        for j in eachindex(p.blocks)
+        # Ψ(Ω) feedback: dΨ_i[:, (n,λ)] += -i Σ_j Σ_n′ C[(n,λ), n′] ξ_j[:, n′]
+        r = p.block_ranges_Ψ[i]
+        dΨ1 = reshape(view(du, first(r):(first(r) + Ns * Nc_i * N_λ1_i - 1)), Ns, Nc_i * N_λ1_i)
+        dΨ2 = reshape(view(du, (first(r) + Ns * Nc_i * N_λ1_i):last(r)), Ns, Nc_i * N_λ2_i)
+        for j in 1:nb
             block_j = p.blocks[j]
-            Δ_j = p.Δ_blocks[j]
-            Nc_j = block_j.Nc
-            N_λ1_j = block_j.N_λ1
-            N_λ2_j = block_j.N_λ2
-
-            Ψ_j = reshape(view(u, p.block_ranges_Ψ[j]), (Ns, Nc_j, block_j.N_λ))
-            Ω11_ij = reshape(view(u, p.pair_ranges_Ω11[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ1_j))
-            Ω12_ij = reshape(view(u, p.pair_ranges_Ω12[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ2_j))
-            Ω21_ij = reshape(view(u, p.pair_ranges_Ω21[i, j]), (Nc_i, N_λ2_i, Nc_j, N_λ1_j))
-
-            dΩ11_ij = reshape(view(du, p.pair_ranges_Ω11[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ1_j))
-            dΩ12_ij = reshape(view(du, p.pair_ranges_Ω12[i, j]), (Nc_i, N_λ1_i, Nc_j, N_λ2_j))
-            dΩ21_ij = reshape(view(du, p.pair_ranges_Ω21[i, j]), (Nc_i, N_λ2_i, Nc_j, N_λ1_j))
-
-            χ_j = block_j.χ_nλ
-            Γ_j = p.Γ[j]
-            dot2 = p.tmp_λ1p[j]
-            dot4 = p.tmp_λ2p[j]
-
-            for n in 1:Nc_i
-                ξ_i_n = @view block_i.ξ_an[:, n]
-                for n_p in 1:Nc_j
-                    ξ_j_np = @view block_j.ξ_an[:, n_p]
-
-                    for λ1 in 1:N_λ1_i
-                        dot1[λ1] = dot(ξ_j_np, @view Ψ_i[:, n, λ1])
-                    end
-                    for λ1_p in 1:N_λ1_j
-                        dot2[λ1_p] = conj(dot(ξ_i_n, @view Ψ_j[:, n_p, λ1_p]))
-                    end
-                    for λ2 in 1:N_λ2_i
-                        dot3[λ2] = dot(ξ_j_np, @view Ψ_i[:, n, N_λ1_i + λ2])
-                    end
-                    for λ2_p in 1:N_λ2_j
-                        dot4[λ2_p] = conj(dot(ξ_i_n, @view Ψ_j[:, n_p, N_λ1_j + λ2_p]))
-                    end
-
-                    for λ1 in 1:N_λ1_i
-                        χ′_nλ1 = χ′_i[n, λ1]
-                        Γ′_nλ1 = Γ′_i[n, λ1]
-                        for λ1_p in 1:N_λ1_j
-                            χ_j_npl1p = χ_j[n_p, λ1_p]
-                            Γ_j_npl1p = Γ_j[n_p, λ1_p]
-                            term1 = -1im * Γ_j_npl1p * dot1[λ1]
-                            term2 = -1im * Γ′_nλ1 * dot2[λ1_p]
-                            pref3 = -1im * (χ_j_npl1p + Δ_j - χ′_nλ1 - Δ_i)
-                            dΩ11_ij[n, λ1, n_p, λ1_p] = term1 + term2 + pref3 * Ω11_ij[n, λ1, n_p, λ1_p]
-                        end
-                    end
-
-                    for λ1 in 1:N_λ1_i
-                        χ′_nλ1 = χ′_i[n, λ1]
-                        Γ′_nλ1 = Γ′_i[n, λ1]
-                        for λ2_p in 1:N_λ2_j
-                            λglob_2p = N_λ1_j + λ2_p
-                            χ_j_npl2p = χ_j[n_p, λglob_2p]
-                            Γ_j_npl2p = Γ_j[n_p, λglob_2p]
-                            term1 = -1im * Γ_j_npl2p * dot1[λ1]
-                            term2 = -1im * Γ′_nλ1 * dot4[λ2_p]
-                            pref3 = -1im * (χ_j_npl2p + Δ_j - χ′_nλ1 - Δ_i)
-                            dΩ12_ij[n, λ1, n_p, λ2_p] = term1 + term2 + pref3 * Ω12_ij[n, λ1, n_p, λ2_p]
-                        end
-                    end
-
-                    for λ2 in 1:N_λ2_i
-                        λglob_2 = N_λ1_i + λ2
-                        χ′_nλ2 = χ′_i[n, λglob_2]
-                        Γ′_nλ2 = Γ′_i[n, λglob_2]
-                        for λ1_p in 1:N_λ1_j
-                            χ_j_npl1p = χ_j[n_p, λ1_p]
-                            Γ_j_npl1p = Γ_j[n_p, λ1_p]
-                            term1 = -1im * Γ_j_npl1p * dot3[λ2]
-                            term2 = -1im * Γ′_nλ2 * dot2[λ1_p]
-                            pref3 = -1im * (χ_j_npl1p + Δ_j - χ′_nλ2 - Δ_i)
-                            dΩ21_ij[n, λ2, n_p, λ1_p] = term1 + term2 + pref3 * Ω21_ij[n, λ2, n_p, λ1_p]
-                        end
-                    end
-                end
-            end
+            Nc_j, N_λ1_j, N_λ2_j = block_j.Nc, block_j.N_λ1, block_j.N_λ2
+            m1 = Nc_i * N_λ1_i * Nc_j
+            m2 = Nc_i * N_λ2_i * Nc_j
+            _sum_last!(p.C_λ1[i, j], u, p.pair_ranges_Ω11[i, j], m1, N_λ1_j, false)
+            _sum_last!(p.C_λ1[i, j], u, p.pair_ranges_Ω12[i, j], m1, N_λ2_j, true)
+            _sum_last!(p.C_λ2[i, j], u, p.pair_ranges_Ω21[i, j], m2, N_λ1_j, false)
+            mul!(dΨ1, block_j.ξ_an, transpose(p.C_λ1[i, j]), -1.0im, 1.0 + 0.0im)
+            mul!(dΨ2, block_j.ξ_an, transpose(p.C_λ2[i, j]), -1.0im, 1.0 + 0.0im)
         end
     end
 
-    _rhs_ρ!(dρ_ab, ρ_ab, p.H_ab, p.Hρ, p.Π_ab, p.dims_ρ_ab[1])
-    _rhs_ρ_extra_baths!(dρ_ab, ρ_ab, p.extra_baths, p.dims_ρ_ab[1])
+    @inbounds for i in 1:nb, j in 1:nb
+        block_i, block_j = p.blocks[i], p.blocks[j]
+        Δ_i, Δ_j = p.Δ_blocks[i], p.Δ_blocks[j]
+        Nc_i, N_λ1_i, N_λ2_i = block_i.Nc, block_i.N_λ1, block_i.N_λ2
+        Nc_j, N_λ1_j, N_λ2_j = block_j.Nc, block_j.N_λ1, block_j.N_λ2
+        λ1_i, λ2_i = 1:N_λ1_i, (N_λ1_i + 1):(N_λ1_i + N_λ2_i)
+        λ1_j, λ2_j = 1:N_λ1_j, (N_λ1_j + 1):(N_λ1_j + N_λ2_j)
+        args = (p.ξΨ[j, i], p.ξΨ[i, j], p.Γ[j], p.Γ′[i], block_j.χ_nλ, p.χ′[i], Δ_i, Δ_j, p.thread_min_Ω)
+
+        _omega_sector!(du, u, p.pair_ranges_Ω11[i, j], Nc_i, Nc_j, λ1_i, λ1_j, args...)
+        _omega_sector!(du, u, p.pair_ranges_Ω12[i, j], Nc_i, Nc_j, λ1_i, λ2_j, args...)
+        _omega_sector!(du, u, p.pair_ranges_Ω21[i, j], Nc_i, Nc_j, λ2_i, λ1_j, args...)
+    end
+
+    _rhs_ρ!(dρ_ab, ρ_ab, p.H_ab, p.Hρ, p.Π_ab, Ns)
+    _rhs_ρ_extra_baths!(dρ_ab, ρ_ab, p.extra_baths, Ns)
     return nothing
 end
