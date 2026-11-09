@@ -10,10 +10,19 @@
     - H SIN desplazar
     - χ_nλ por lead, con μ=μ_α en la parte Padé (polos Matsubara en μ+iξ_k/β)
     - Σᴸ_nλ y Σᴳ_nλ por lead, con μ=μ_α en los residuos N49 f(z_k+ϵ_n-μ)
-    - Δ_blocks = [+δV/2, -δV/2]  (solo el bias, NO μ_α)
+    - Δ_blocks = [0, 0]  (el bias ya está en μ_α)
 
-  Nota Nx=1: ξ_L=ξ_R → factor geométrico ×2 en la corriente.
-             G_TDNEGF/2 coincide con Landauer estándar.
+  IMPORTANTE: el bias se aplica UNA sola vez.
+    Δ_blocks desplaza rígidamente todo el lead (banda + μ). Si μ_α ya está en
+    Σ/χ, poner además Δ_blocks = [+δV/2, -δV/2] duplica el bias (diferencia
+    efectiva 2δV) y la corriente sale ×2. Una versión anterior de este script
+    hacía eso y lo compensaba dividiendo G entre 2, atribuyéndolo a un "factor
+    geométrico" de Nx=1 que no existe.
+    Verificado (Nx=1, E_F=0, β=40, δV=0.01, t=300), G en e²/h:
+      Landauer                                  4.000000
+      μ_α en Σ/χ  +  Δ_blocks=±δV/2  (doble)    7.999977
+      μ_α en Σ/χ  +  Δ_blocks=0      (una vez)  4.000000
+      μ=E_F en Σ/χ + Δ_blocks=±δV/2  (una vez)  3.999989
 =#
 
 using Pkg
@@ -118,8 +127,9 @@ function run_tdnegf_point(E_F::Float64)
     left_block  = SelfEnergyBlock(:left,  Nc, N_λ1, N_λ2, Σᴸ_nλ_L, Σᴳ_nλ_L, χ_nλ_L, ξ_anL)
     right_block = SelfEnergyBlock(:right, Nc, N_λ1, N_λ2, Σᴸ_nλ_R, Σᴳ_nλ_R, χ_nλ_R, ξ_anR)
 
-    # H sin desplazar, Δ = solo el bias pequeño
-    Δ_blocks = ComplexF64[+δV/2, -δV/2]
+    # H sin desplazar. El bias ya está en μ_α (Σ/χ): Δ_blocks = 0.
+    # No usar también Δ_blocks = ±δV/2, eso duplica el bias (ver encabezado).
+    Δ_blocks = ComplexF64[0.0, 0.0]
 
     p_model = ModelParamsTDNEGF(Nx=Nx, Ny=Ny, Nσ=Nσ, N_orb=N_orb,
                                  Nα=2, N_λ1=N_λ1, N_λ2=N_λ2)
@@ -174,21 +184,19 @@ Threads.@threads for i in 1:N_pts
     G_tdnegf[i], I_L_ss[i], I_R_ss[i], dI_ss[i] = run_tdnegf_point(E_F_vals[i])
 end
 
-# Factor de canales: G_TDNEGF = 2 × G_Landauer (factor ×2 sistemático)
-G_corrected = G_tdnegf ./ 2.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Parte 5: Resultados
 # ═══════════════════════════════════════════════════════════════════════════════
 println("\n" * "="^75)
-println("COMPARACIÓN  [ħ=e=1,  G_corr = G_TDNEGF/2  (factor de canales)]")
+println("COMPARACIÓN  [ħ=e=1, G en unidades de e²/ħ]")
 println("="^75)
-@printf("%-7s  %-12s  %-12s  %-9s\n", "E_F", "G_Landauer", "G_TDNEGF/2", "err(%)")
+@printf("%-7s  %-12s  %-12s  %-9s\n", "E_F", "G_Landauer", "G_TDNEGF", "err(%)")
 println("-"^50)
 for i in 1:N_pts
-    err = 100.0 * abs(G_ref[i] - G_corrected[i]) / (abs(G_ref[i]) + 1e-10)
+    err = 100.0 * abs(G_ref[i] - G_tdnegf[i]) / (abs(G_ref[i]) + 1e-10)
     @printf("%-7.2f  %-12.6f  %-12.6f  %-9.4f\n",
-            E_F_vals[i], G_ref[i], G_corrected[i], err)
+            E_F_vals[i], G_ref[i], G_tdnegf[i], err)
 end
 
 println("\nConservación de corriente:")
@@ -197,9 +205,9 @@ for i in 1:N_pts
 end
 
 # Guardar datos
-data = hcat(E_F_vals, G_ref, G_corrected)
+data = hcat(E_F_vals, G_ref, G_tdnegf)
 out_csv = joinpath(dirname(@__DIR__), "examples", "conductance_data.csv")
-writedlm(out_csv, vcat(["E_F" "G_Landauer" "G_TDNEGF_div2"], data), ",")
+writedlm(out_csv, vcat(["E_F" "G_Landauer" "G_TDNEGF"], data), ",")
 println("\nDatos guardados en: $out_csv")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -212,7 +220,7 @@ import matplotlib.pyplot as plt
 data = np.loadtxt('$out_csv', delimiter=',', skiprows=1)
 E_F    = data[:, 0]
 G_ref  = data[:, 1]
-G_corr = data[:, 2]
+G_td   = data[:, 2]
 
 E_step = np.linspace(-5.5, 5.5, 2000)
 G_steps = np.where(np.abs(E_step) < 1.0, 4/(2*np.pi),
@@ -221,7 +229,7 @@ G_steps = np.where(np.abs(E_step) < 1.0, 4/(2*np.pi),
 fig, ax = plt.subplots(figsize=(7, 5))
 ax.plot(E_step, G_steps, 'k--', lw=1.5, alpha=0.5, label='Escalones T=0 exactos')
 ax.plot(E_F, G_ref,   'bs-', ms=6, lw=2, label=r'Landauer \$\\Sigma(E)\$')
-ax.plot(E_F, G_corr,  'g^-', ms=6, lw=2, label='TDNEGF / 2 (canales)')
+ax.plot(E_F, G_td,    'g^-', ms=6, lw=2, label='TDNEGF')
 for g in [2/(2*np.pi), 4/(2*np.pi)]:
     ax.axhline(g, color='gray', ls=':', lw=1)
 ax.text(4.8, 2/(2*np.pi)+0.01, 'T=2', color='gray', fontsize=10, ha='right')
